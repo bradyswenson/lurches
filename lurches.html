@@ -1471,10 +1471,28 @@ const Events = {
   },
 
   flood(world, sim) {
-    const spreadChance = 0.15 + this._severity * 0.06; // 0.21 to 0.75
-    const waves = Math.ceil(this._severity / 3); // 1-4 waves of spreading
+    const spreadChance = 0.2 + this._severity * 0.07; // 0.27 to 0.9
+    const waves = this._severity * 2; // sev1=2, sev5=10, sev10=20 waves deep
     let totalFlooded = 0;
     let kills = 0;
+
+    // Rainfall: spawn random flood sources across the map (scales with severity)
+    // This makes floods deadly even on landlocked maps like Eden
+    const rainfallSources = Math.round(this._severity * this._severity * 0.5); // sev1=0, sev5=12, sev10=50
+    for (let i = 0; i < rainfallSources; i++) {
+      const rx = world.rng.nextInt(world.w);
+      const ry = world.rng.nextInt(world.h);
+      const t = world.getTerrain(rx, ry);
+      if (t !== TERRAIN.DEEP_WATER && t !== TERRAIN.SHALLOWS && t !== TERRAIN.MOUNTAIN && t !== TERRAIN.WALL) {
+        world.setTerrain(rx, ry, TERRAIN.SHALLOWS);
+        this.addVfx('flood', rx, ry, 40);
+        totalFlooded++;
+        const l = world.getLurch(rx, ry);
+        if (l && l.alive) {
+          l.hp = 0; l.causeOfDeath = 'flood'; kills++;
+        }
+      }
+    }
 
     for (let wave = 0; wave < waves; wave++) {
       const toConvert = [];
@@ -1491,18 +1509,17 @@ const Events = {
         }
       }
       for (const [x, y] of toConvert) {
-        // Kill lurches caught in the flood
         const l = world.getLurch(x, y);
         if (l && l.alive) {
-          const killChance = 0.2 + this._severity * 0.06; // 0.26 to 0.8
+          const killChance = 0.3 + this._severity * 0.07; // sev1=0.37, sev10=1.0
           if (world.rng.next() < killChance) {
             l.hp = 0; l.causeOfDeath = 'flood'; kills++;
           } else {
-            l.hp -= this.sevInt(20);
+            l.hp -= this.sevInt(30);
           }
         }
         world.setTerrain(x, y, TERRAIN.SHALLOWS);
-        this.addVfx('flood', x, y, 30 + wave * 10);
+        this.addVfx('flood', x, y, 30 + Math.min(wave, 8) * 5);
         totalFlooded++;
       }
     }
@@ -1533,11 +1550,11 @@ const Events = {
         burned.push([x, y]);
         const l = world.getLurch(x, y);
         if (l && l.alive) {
-          const burnDmg = this.sevInt(30);
-          if (this._severity >= 7 && world.rng.next() < 0.4 + this._severity * 0.04) {
+          const killChance = 0.15 + this._severity * 0.08; // sev1=0.23, sev5=0.55, sev10=0.95
+          if (world.rng.next() < killChance) {
             l.hp = 0; l.causeOfDeath = 'wildfire';
           } else {
-            l.hp -= burnDmg;
+            l.hp -= this.sevInt(40);
           }
         }
         for (const [nx, ny] of world.neighbors8(x, y)) {
@@ -1584,17 +1601,25 @@ const Events = {
       // Lurch damage — lethal at epicenter, decreasing with distance
       const l = world.getLurch(x, y);
       if (l && l.alive) {
-        const killChance = Math.max(0, (1 - distRatio * 0.8) * (this._severity / 10));
-        if (distRatio < 0.15) {
-          // Ground zero: instant kill at high severity
-          if (this._severity >= 7 || world.rng.next() < 0.8) {
-            l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
-          }
-        } else if (world.rng.next() < killChance) {
+        const sevScale = this._severity / 10; // 0.1 to 1.0
+        if (distRatio < 0.3) {
+          // Ground zero — everything dies
           l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
+        } else if (distRatio < 0.6) {
+          // Inner zone — high kill chance, scales with severity
+          if (world.rng.next() < 0.5 + sevScale * 0.45) {
+            l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
+          } else {
+            l.hp -= Math.round(l.hp * 0.8);
+          }
         } else {
-          // Damage falloff
-          l.hp -= Math.round(this.sevInt(30) * (1 - distRatio * 0.7));
+          // Outer zone — moderate kill chance at high severity, heavy damage
+          const outerKill = sevScale * (1 - distRatio) * 1.5;
+          if (world.rng.next() < outerKill) {
+            l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
+          } else {
+            l.hp -= Math.round(this.sevInt(40) * (1 - distRatio));
+          }
         }
       }
     }
