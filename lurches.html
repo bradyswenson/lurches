@@ -511,6 +511,7 @@
   <div id="grid-container">
     <canvas id="grid-canvas"></canvas>
     <div id="grid-overlay"></div>
+    <div id="god-tool-status" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(20,20,32,0.9);border:1px solid #aa44aa;padding:6px 16px;border-radius:4px;color:#dd88dd;font-size:12px;z-index:90;pointer-events:none;letter-spacing:1px;"></div>
     <div id="godmode-panel">
       <h2>⚡ GOD MODE ⚡</h2>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:6px 8px;background:#1a1a28;border-radius:4px;">
@@ -537,19 +538,18 @@
       <div class="gm-divider"></div>
       <div class="panel-title">Biological Events</div>
       <div class="gm-row">
-        <button class="gm-btn" data-event="virus"><kbd>7</kbd> Virus</button>
-        <button class="gm-btn" data-event="plague"><kbd>8</kbd> Plague</button>
+        <button class="gm-btn" data-event="plague"><kbd>7</kbd> Plague</button>
       </div>
       <div class="gm-row">
-        <button class="gm-btn" data-event="mutationburst"><kbd>9</kbd> Mutation Burst</button>
+        <button class="gm-btn" data-event="mutationburst"><kbd>8</kbd> Mutation Burst</button>
         <button class="gm-btn" data-event="fertwave"><kbd>F</kbd> Fertility Wave</button>
       </div>
       <div class="gm-row">
-        <button class="gm-btn" data-event="bottleneck"><kbd>B</kbd> Bottleneck (kill 50%)</button>
+        <button class="gm-btn" data-event="bottleneck"><kbd>B</kbd> Cull (kill 50%)</button>
         <button class="gm-btn" data-event="rejuvenation"><kbd>R</kbd> Rejuvenation</button>
       </div>
       <div class="gm-divider"></div>
-      <div class="panel-title">Direct — click grid to target</div>
+      <div class="panel-title">Direct — click or drag on grid</div>
       <div class="gm-row">
         <button class="gm-btn" data-tool="smite"><kbd>L</kbd> Smite ⚡</button>
         <button class="gm-btn" data-tool="bless"><kbd>V</kbd> Bless ✨</button>
@@ -1692,16 +1692,29 @@ const Events = {
     sim.log(`FERTILE SEASON [${this._severity}] — food regen ×${mult.toFixed(1)} for ${dur} rounds`, 'event');
   },
 
-  virus(world, sim) {
+  plague(world, sim) {
     if (world.lurches.length === 0) return;
+    // Phase 1: Patient zero starts the contagion
     const patient0 = world.rng.pick(world.lurches.filter(l => l.alive));
     if (!patient0) return;
     patient0.diseased = true;
-    patient0.diseaseTurns = this.sevInt(20);
+    patient0.diseaseTurns = this.sevInt(25);
+    // Phase 2: Weak lurches get infected immediately (low adaptability)
+    const threshold = 0.6 - this._severity * 0.03; // sev10 → 0.3
+    const chance = 0.2 + this._severity * 0.05;
+    let infected = 1; // count patient zero
+    for (const l of world.lurches) {
+      if (l.alive && !l.diseased && l.genome.adaptability < threshold && world.rng.next() < chance) {
+        l.diseased = true;
+        l.diseaseTurns = this.sevInt(20);
+        infected++;
+      }
+    }
+    // Phase 3: Ongoing contagion spreads from infected to neighbors
     const spreadRate = 0.05 + this._severity * 0.03;
     const dur = this.sevInt(30);
     this.add({
-      name: 'Virus', duration: dur,
+      name: 'Plague', duration: dur,
       tick(w) {
         for (const l of w.lurches) {
           if (!l.alive || !l.diseased) continue;
@@ -1715,21 +1728,7 @@ const Events = {
         }
       }
     });
-    sim.log(`VIRUS [${this._severity}] — Patient zero: Lurch #${patient0.id}`, 'event');
-  },
-
-  plague(world, sim) {
-    const threshold = 0.6 - this._severity * 0.03; // sev10 → 0.3 adaptability threshold
-    const chance = 0.3 + this._severity * 0.06;
-    let infected = 0;
-    for (const l of world.lurches) {
-      if (l.alive && l.genome.adaptability < threshold && world.rng.next() < chance) {
-        l.diseased = true;
-        l.diseaseTurns = this.sevInt(20);
-        infected++;
-      }
-    }
-    sim.log(`PLAGUE [${this._severity}] — ${infected} Lurches infected`, 'event');
+    sim.log(`PLAGUE [${this._severity}] — Patient zero: #${patient0.id}, ${infected} initially infected, contagion spreading...`, 'event');
   },
 
   mutationburst(world, sim) {
@@ -2642,12 +2641,26 @@ const ui = {
 
   hideGodMode() {
     sim.godMode = false;
-    sim.godTool = null;
+    // Keep godTool active even when panel closes — user needs to click grid
     this.godPanel.style.display = 'none';
   },
 
   toggleGodMode() {
     if (sim.godMode) this.hideGodMode(); else this.showGodMode();
+  },
+
+  updateGodToolStatus() {
+    const el = document.getElementById('god-tool-status');
+    const canvas = document.getElementById('grid-canvas');
+    if (sim.godTool) {
+      const labels = { smite: '⚡ SMITE — click or drag', bless: '✨ BLESS — click or drag', food: '🍎 PLACE FOOD — click or drag', wall: '🧱 BUILD WALL — click or drag' };
+      el.textContent = (labels[sim.godTool] || sim.godTool) + '  (ESC to cancel)';
+      el.style.display = 'block';
+      canvas.style.cursor = 'crosshair';
+    } else {
+      el.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
   }
 };
 
@@ -2682,6 +2695,8 @@ function initInput() {
         break;
       case 'Escape':
         ui.hideGodMode();
+        sim.godTool = null;
+        ui.updateGodToolStatus();
         document.getElementById('help-overlay').classList.remove('visible');
         break;
       case '?':
@@ -2691,20 +2706,11 @@ function initInput() {
         if (sim.paused) { sim.stepOnce(); }
         break;
       case 'f': case 'F':
-        if (!sim.godMode) {
-          // Follow: center on selected lurch
-          if (sim.selectedLurch && sim.selectedLurch.alive) {
-            renderer.scrollX = sim.selectedLurch.x - Math.floor(renderer.visibleCols / 2);
-            renderer.scrollY = sim.selectedLurch.y - Math.floor(renderer.visibleRows / 2);
-            renderer.render();
-          }
-        } else {
-          // Fertility wave in god mode
-          const sevEl = document.getElementById('god-severity');
-          Events._severity = sevEl ? parseInt(sevEl.value) || 5 : 5;
-          Events.fertwave(world, sim);
+        // Follow: center on selected lurch
+        if (sim.selectedLurch && sim.selectedLurch.alive) {
+          renderer.scrollX = sim.selectedLurch.x - Math.floor(renderer.visibleCols / 2);
+          renderer.scrollY = sim.selectedLurch.y - Math.floor(renderer.visibleRows / 2);
           renderer.render();
-          ui.update();
         }
         break;
       case 'ArrowLeft':  renderer.scrollX = world.wrapX(renderer.scrollX - 3); renderer.render(); break;
@@ -2713,91 +2719,134 @@ function initInput() {
       case 'ArrowDown':  renderer.scrollY = world.wrapY(renderer.scrollY + 3); renderer.render(); break;
     }
 
-    // God mode number keys
-    if (sim.godMode) {
-      const godEvents = {
-        '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
-        '5': 'iceage', '6': 'meteor', '0': 'fertile',
-        '7': 'virus', '8': 'plague', '9': 'mutationburst',
-        'b': 'bottleneck', 'B': 'bottleneck',
-        'r': 'rejuvenation', 'R': 'rejuvenation',
-      };
-      const godTools = {
-        'l': 'smite', 'L': 'smite',
-        'v': 'bless', 'V': 'bless',
-        'p': 'food', 'P': 'food',
-        'w': 'wall', 'W': 'wall',
-      };
+    // God mode hotkeys — work anytime (don't need popover open)
+    const godEvents = {
+      '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
+      '5': 'iceage', '6': 'meteor', '0': 'fertile',
+      '7': 'plague', '8': 'mutationburst',
+      'b': 'bottleneck', 'B': 'bottleneck',
+      'r': 'rejuvenation', 'R': 'rejuvenation',
+    };
+    const godTools = {
+      'l': 'smite', 'L': 'smite',
+      'v': 'bless', 'V': 'bless',
+      'p': 'food', 'P': 'food',
+      'w': 'wall', 'W': 'wall',
+    };
 
-      if (godEvents[e.key]) {
-        const sevEl = document.getElementById('god-severity');
-        Events._severity = sevEl ? parseInt(sevEl.value) || 5 : 5;
-        Events[godEvents[e.key]](world, sim);
-        renderer.render();
-        ui.update();
-      }
-      if (godTools[e.key]) {
-        sim.godTool = godTools[e.key];
-        sim.log(`God tool selected: ${sim.godTool}`, 'god');
-      }
+    if (godEvents[e.key]) {
+      triggerGodEvent(godEvents[e.key]);
+      ui.hideGodMode();
+    }
+    if (godTools[e.key]) {
+      sim.godTool = godTools[e.key];
+      sim.log(`God tool selected: ${sim.godTool} — click on grid`, 'god');
+      ui.hideGodMode();
+      ui.updateGodToolStatus();
     }
   });
 
-  // Click on grid
+  // God tool apply function — reused by click and drag
+  function applyGodToolAt(gx, gy) {
+    switch (sim.godTool) {
+      case 'smite': {
+        const l = world.getLurch(gx, gy);
+        if (l && l.alive) {
+          l.hp = 0;
+          l.causeOfDeath = 'divine smite';
+          l.alive = false;
+          world.removeLurch(l);
+          sim.totalDeaths++;
+        }
+        break;
+      }
+      case 'bless': {
+        const l = world.getLurch(gx, gy);
+        if (l && l.alive) {
+          l.hp = l.maxHP;
+          l.hunger = 0;
+          l.energy = 100;
+          l.stress = 0;
+          l.diseased = false;
+        }
+        break;
+      }
+      case 'food':
+        world.setFood(gx, gy, CONFIG.foodCap);
+        break;
+      case 'wall':
+        world.setTerrain(gx, gy, TERRAIN.WALL);
+        const l = world.getLurch(gx, gy);
+        if (l && l.alive) {
+          l.hp = 0; l.causeOfDeath = 'crushed'; l.alive = false;
+          world.removeLurch(l);
+          sim.totalDeaths++;
+        }
+        break;
+    }
+    Events.addVfx('explosion', gx, gy, 12);
+  }
+
+  // Click and drag on grid
   const canvas = document.getElementById('grid-canvas');
-  canvas.addEventListener('click', (e) => {
+  let godDragging = false;
+  let godLastCell = null;
+  let godDragCount = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // left button only
     const rect = canvas.getBoundingClientRect();
     const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
 
-    if (sim.godMode && sim.godTool) {
-      // Apply god tool
-      switch (sim.godTool) {
-        case 'smite': {
-          const l = world.getLurch(gx, gy);
-          if (l && l.alive) {
-            l.hp = 0;
-            l.causeOfDeath = 'divine smite';
-            l.alive = false;
-            world.removeLurch(l);
-            sim.totalDeaths++;
-            sim.log(`⚡ SMITE — Lurch #${l.id} struck down`, 'god');
-          }
-          break;
-        }
-        case 'bless': {
-          const l = world.getLurch(gx, gy);
-          if (l && l.alive) {
-            l.hp = l.maxHP;
-            l.hunger = 0;
-            l.energy = 100;
-            l.stress = 0;
-            l.diseased = false;
-            sim.log(`✨ BLESS — Lurch #${l.id} fully healed`, 'god');
-          }
-          break;
-        }
-        case 'food':
-          world.setFood(gx, gy, CONFIG.foodCap);
-          sim.log(`🍎 Placed food at (${gx},${gy})`, 'god');
-          break;
-        case 'wall':
-          world.setTerrain(gx, gy, TERRAIN.WALL);
-          const l = world.getLurch(gx, gy);
-          if (l && l.alive) {
-            l.hp = 0; l.causeOfDeath = 'crushed'; l.alive = false;
-            world.removeLurch(l);
-            sim.totalDeaths++;
-          }
-          sim.log(`🧱 Built wall at (${gx},${gy})`, 'god');
-          break;
-      }
-      sim.godTool = null;
+    if (sim.godTool) {
+      godDragging = true;
+      godLastCell = `${gx},${gy}`;
+      godDragCount = 1;
+      applyGodToolAt(gx, gy);
       renderer.render();
-      ui.update();
+      e.preventDefault();
       return;
     }
+  });
 
-    // Normal click: select lurch
+  canvas.addEventListener('mousemove', (e) => {
+    if (!godDragging || !sim.godTool) return;
+    const rect = canvas.getBoundingClientRect();
+    const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
+    const cellKey = `${gx},${gy}`;
+    if (cellKey !== godLastCell) {
+      godLastCell = cellKey;
+      godDragCount++;
+      applyGodToolAt(gx, gy);
+      renderer.render();
+    }
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!godDragging) return;
+    godDragging = false;
+    // Log a summary of what happened
+    const toolLabels = { smite: '⚡ SMITE', bless: '✨ BLESS', food: '🍎 FOOD', wall: '🧱 WALL' };
+    const label = toolLabels[sim.godTool] || sim.godTool;
+    if (godDragCount === 1) {
+      const rect = canvas.getBoundingClientRect();
+      const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
+      sim.log(`${label} at (${gx},${gy})`, 'god');
+    } else {
+      sim.log(`${label} — painted ${godDragCount} cells`, 'god');
+    }
+    godDragCount = 0;
+    godLastCell = null;
+    // Tool stays active for more painting — ESC to cancel
+    renderer.render();
+    ui.update();
+  });
+
+  // Normal click for lurch selection (only when no god tool)
+  canvas.addEventListener('click', (e) => {
+    if (sim.godTool) return; // handled by mousedown/up
+    const rect = canvas.getBoundingClientRect();
+    const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
     const lurch = world.getLurch(gx, gy);
     sim.selectedLurch = lurch || null;
     renderer.render();
@@ -2816,7 +2865,7 @@ function initInput() {
       Events[eventName](world, sim);
       // Log to timeline
       const name = eventName.charAt(0).toUpperCase() + eventName.slice(1);
-      const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', virus:'🦠', plague:'💀', mutationburst:'🧪', fertwave:'🌸', bottleneck:'⚡', rejuvenation:'✨' };
+      const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', plague:'🦠', mutationburst:'🧪', fertwave:'🌸', bottleneck:'⚡', rejuvenation:'✨' };
       sim.addTimeline(icons[eventName] || '⚡', `${name} [${Events._severity}]`, 'godmode');
       renderer.render();
       ui.update();
@@ -2835,6 +2884,7 @@ function initInput() {
       sim.godTool = btn.dataset.tool;
       sim.log(`God tool selected: ${sim.godTool} — click on grid`, 'god');
       ui.hideGodMode();
+      ui.updateGodToolStatus();
     });
   });
 
@@ -3006,9 +3056,8 @@ const HELP_CONTENT = {
     <h3>Biological Events</h3>
     <table>
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
-      <tr><td><code>7</code></td><td>Virus</td><td>Spreads between adjacent Lurches</td></tr>
-      <tr><td><code>8</code></td><td>Plague</td><td>Targets low-Adaptability Lurches</td></tr>
-      <tr><td><code>9</code></td><td>Mutation Burst</td><td>Mutation rate spikes — wild offspring</td></tr>
+      <tr><td><code>7</code></td><td>Plague</td><td>Patient zero + weak get infected, contagion spreads</td></tr>
+      <tr><td><code>8</code></td><td>Mutation Burst</td><td>Mutation rate spikes — wild offspring</td></tr>
       <tr><td><code>F</code></td><td>Fertility Wave</td><td>All Lurches get fertility boost</td></tr>
       <tr><td><code>B</code></td><td>Bottleneck</td><td>Kill a percentage randomly</td></tr>
       <tr><td><code>R</code></td><td>Rejuvenation</td><td>Heal and refresh all Lurches</td></tr>
@@ -3032,7 +3081,7 @@ const HELP_CONTENT = {
     </table>
     <h3>Mouse</h3>
     <p><strong>Click</strong> a Lurch on the grid to inspect it — see its genome, stats, parents, children, and last action in the side panel.</p>
-    <p>In God Mode, select a tool then <strong>click</strong> the grid to apply it (smite, bless, place food, or build wall).</p>
+    <p>In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it (smite, bless, place food, or build wall). Tool stays active until you press ESC.</p>
     <h3>Tips</h3>
     <p>Start paused and click around to see the initial population. Press Space to run, then watch the event log and population sparkline. When things get boring — drop a meteor.</p>
   `
