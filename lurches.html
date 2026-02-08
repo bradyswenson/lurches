@@ -1,0 +1,3051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lurches — Genetic Simulation Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a14;
+    color: #b0b0c0;
+    font-family: 'Menlo', 'Courier New', 'Consolas', monospace;
+    font-size: 13px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* Top Bar */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: #12121e;
+    border-bottom: 1px solid #2a2a3a;
+    min-height: 36px;
+    flex-shrink: 0;
+  }
+  #topbar .title { color: #e0e0f0; font-size: 16px; font-weight: bold; letter-spacing: 2px; }
+  #topbar .stats { display: flex; gap: 18px; color: #8888aa; font-size: 12px; }
+  #topbar .stats span { color: #ccccdd; }
+  #topbar .controls { display: flex; gap: 8px; align-items: center; }
+  #topbar .controls button {
+    background: #1e1e2e; border: 1px solid #3a3a4a; color: #aab; padding: 3px 10px;
+    font-family: inherit; font-size: 12px; cursor: pointer; border-radius: 3px;
+  }
+  #topbar .controls button:hover { background: #2a2a3e; border-color: #5a5a7a; }
+  #topbar .controls button.active { background: #3a2a2a; border-color: #aa4444; color: #ff8888; }
+  #speed-display { color: #88aa88; min-width: 30px; text-align: center; }
+
+  /* Main Area */
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Grid Canvas */
+  #grid-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #0e0e1a;
+  }
+  #grid-canvas {
+    position: absolute;
+    top: 0; left: 0;
+  }
+  #grid-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  /* Side Panel */
+  #sidepanel {
+    width: 300px;
+    background: #10101c;
+    border-left: 1px solid #2a2a3a;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .panel-section {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1e1e2e;
+  }
+  .panel-title {
+    color: #8888bb;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 0;
+    font-size: 12px;
+  }
+  .stat-label { color: #7777aa; }
+  .stat-value { color: #ccccdd; }
+  .gene-bar {
+    display: flex;
+    align-items: center;
+    margin: 2px 0;
+    font-size: 11px;
+  }
+  .gene-label { width: 32px; color: #7777aa; }
+  .gene-track {
+    flex: 1;
+    height: 10px;
+    background: #1a1a2a;
+    margin: 0 6px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .gene-fill { height: 100%; border-radius: 2px; }
+  .gene-val { width: 60px; text-align: right; color: #aaaacc; }
+  .gene-find {
+    width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555577; font-size: 10px; border-radius: 3px; margin-left: 2px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .gene-find:hover { color: #ccccee; background: #2a2a3e; }
+
+  /* Timeline */
+  #timeline-section { max-height: 200px; overflow-y: auto; }
+  .timeline-toggle {
+    cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  }
+  .timeline-toggle:hover { color: #aaaadd; }
+  .tl-entry {
+    display: flex; gap: 6px; padding: 2px 0; font-size: 11px; border-bottom: 1px solid #151520;
+    align-items: flex-start;
+  }
+  .tl-round { color: #555577; min-width: 46px; text-align: right; font-size: 10px; flex-shrink: 0; }
+  .tl-icon { font-size: 12px; flex-shrink: 0; }
+  .tl-msg { color: #9999bb; }
+  .tl-entry.godmode .tl-msg { color: #cc88cc; }
+  .tl-entry.trait .tl-msg { color: #88cccc; }
+  .tl-entry.milestone .tl-msg { color: #cccc66; }
+
+  /* Bottom Bar */
+  #bottombar {
+    display: flex;
+    flex-direction: column;
+    background: #0c0c18;
+    border-top: 1px solid #2a2a3a;
+    max-height: 200px;
+    flex-shrink: 0;
+  }
+  #event-log {
+    flex: 1;
+    padding: 6px 12px;
+    overflow-y: auto;
+    font-size: 11px;
+    max-height: 120px;
+    min-height: 60px;
+  }
+  .log-entry { margin: 1px 0; color: #6666aa; }
+  .log-entry.birth { color: #66aa66; }
+  .log-entry.death { color: #aa4444; }
+  .log-entry.combat { color: #cc8844; }
+  .log-entry.event { color: #cccc44; }
+  .log-entry.god { color: #cc44cc; }
+
+  #hotkeys {
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #555577;
+    border-top: 1px solid #1a1a2a;
+    white-space: nowrap;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  #hotkeys kbd {
+    background: #1a1a2a;
+    border: 1px solid #2a2a3a;
+    border-radius: 2px;
+    padding: 0 4px;
+    color: #8888aa;
+    font-family: inherit;
+    font-size: 10px;
+  }
+
+  /* God Mode Overlay */
+  #godmode-panel {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #14141f;
+    border: 2px solid #aa44aa;
+    padding: 16px 20px;
+    z-index: 100;
+    min-width: 360px;
+    box-shadow: 0 0 40px rgba(170, 68, 170, 0.3);
+  }
+  #godmode-panel h2 {
+    color: #dd66dd;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+  .gm-row { display: flex; gap: 8px; margin: 4px 0; }
+  .gm-btn {
+    flex: 1;
+    background: #1e1e2e;
+    border: 1px solid #3a3a4a;
+    color: #ccaadd;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+    text-align: left;
+  }
+  .gm-btn:hover { background: #2a2a3e; border-color: #aa44aa; }
+  .gm-btn kbd { color: #dd88dd; margin-right: 4px; }
+  .gm-divider { border-top: 1px solid #2a2a3a; margin: 8px 0; }
+
+  /* Setup Screen */
+  #setup-screen {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #0a0a14;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .setup-card {
+    background: #10101c;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 32px 36px 28px;
+    width: 420px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .setup-header {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #1e1e2e;
+  }
+  .setup-header h1 {
+    color: #ccccee;
+    font-size: 28px;
+    letter-spacing: 8px;
+    margin-bottom: 6px;
+  }
+  .setup-header .subtitle {
+    color: #555577;
+    font-size: 12px;
+    font-style: italic;
+  }
+  .setup-header .ascii-art {
+    color: #333355;
+    font-size: 10px;
+    line-height: 1.1;
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+  .setup-group {
+    margin-bottom: 14px;
+  }
+  .setup-group-title {
+    color: #666688;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .setup-row { display: flex; gap: 10px; }
+  .setup-field { flex: 1; margin-bottom: 10px; }
+  .setup-field label {
+    display: block;
+    color: #7777aa;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .setup-field select, .setup-field input {
+    background: #14142a;
+    border: 1px solid #2a2a44;
+    color: #ccccdd;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    width: 100%;
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .setup-field select:focus, .setup-field input:focus {
+    border-color: #5555aa;
+  }
+  .setup-field select { cursor: pointer; }
+  #start-btn {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    background: linear-gradient(180deg, #1e2e1e 0%, #1a2a1a 100%);
+    border: 1px solid #44aa44;
+    color: #88ee88;
+    padding: 10px 0;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 3px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #start-btn:hover { background: linear-gradient(180deg, #2a3e2a 0%, #243a24 100%); box-shadow: 0 0 16px rgba(68,170,68,0.2); }
+
+  /* Population Sparkline */
+  #sparkline-canvas {
+    width: 100%;
+    height: 40px;
+  }
+
+  /* Selection highlight */
+  .selected-highlight {
+    position: absolute;
+    border: 2px solid #ffff44;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(255,255,68,0.4);
+    z-index: 50;
+  }
+
+  /* Help Popover */
+  #help-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 5, 12, 0.85);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+  }
+  #help-overlay.visible { display: flex; }
+  #help-card {
+    background: #10101c;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    width: 580px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.6);
+  }
+  #help-card .help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #1e1e2e;
+  }
+  #help-card .help-header h2 { color: #ccccee; font-size: 14px; letter-spacing: 2px; }
+  #help-close {
+    background: none; border: none; color: #666688; cursor: pointer;
+    font-family: inherit; font-size: 16px; padding: 2px 6px;
+  }
+  #help-close:hover { color: #aaaacc; }
+  .help-tabs {
+    display: flex;
+    border-bottom: 1px solid #1e1e2e;
+    padding: 0 8px;
+  }
+  .help-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #666688;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+  .help-tab:hover { color: #aaaacc; }
+  .help-tab.active {
+    color: #ccccee;
+    border-bottom-color: #6666aa;
+  }
+  .help-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #9999bb;
+  }
+  .help-body h3 { color: #aaaacc; font-size: 13px; margin: 12px 0 6px; }
+  .help-body h3:first-child { margin-top: 0; }
+  .help-body p { margin: 4px 0 8px; }
+  .help-body table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+  .help-body th { text-align: left; color: #8888aa; font-size: 11px; padding: 3px 6px; border-bottom: 1px solid #1e1e2e; }
+  .help-body td { padding: 3px 6px; border-bottom: 1px solid #14141e; }
+  .help-body code { background: #1a1a2e; padding: 1px 4px; border-radius: 2px; color: #aaccaa; }
+  .help-body .chip {
+    display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
+    background: #1a1a2e; margin-right: 4px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0a14; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- SETUP SCREEN                           -->
+<!-- ═══════════════════════════════════════ -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-header">
+      <h1>LURCHES</h1>
+      <div class="subtitle">"Nostalgic terrarium you can smite"</div>
+      <div class="ascii-art">
+~..##^^..~..<span style="color:#ff4444">@</span>.##^^""^^##...<span style="color:#44ff44">@</span>..~<br>
+..##<span style="color:#4488ff">@</span>^""^^##....##^^""<span style="color:#ffff44">@</span>^##...<br>
+~..##^^..<span style="color:#ff44ff">@</span>~~..##^^""^^##<span style="color:#44ffff">@</span>.~
+      </div>
+    </div>
+
+    <div class="setup-group">
+      <div class="setup-group-title">World</div>
+      <div class="setup-row">
+        <div class="setup-field">
+          <label>Map</label>
+          <select id="map-preset">
+            <option value="pangaea">Pangaea</option>
+            <option value="eden">Eden</option>
+            <option value="crucible">The Crucible</option>
+            <option value="archipelago">Archipelago</option>
+            <option value="ringworld">Ring World</option>
+            <option value="waterworld">Waterworld</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+        <div class="setup-field">
+          <label>Width</label>
+          <input type="number" id="grid-w" value="80" min="20" max="200">
+        </div>
+        <div class="setup-field">
+          <label>Height</label>
+          <input type="number" id="grid-h" value="40" min="20" max="100">
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-group">
+      <div class="setup-group-title">Population</div>
+      <div class="setup-row">
+        <div class="setup-field">
+          <label>Species</label>
+          <select id="lurch-preset">
+            <option value="balanced">Balanced</option>
+            <option value="warriors">Warriors</option>
+            <option value="thinkers">Thinkers</option>
+            <option value="breeders">Breeders</option>
+            <option value="chaos">Chaos</option>
+            <option value="specialists">Specialists</option>
+          </select>
+        </div>
+        <div class="setup-field">
+          <label>Count</label>
+          <input type="number" id="pop-count" value="40" min="4" max="200">
+        </div>
+        <div class="setup-field">
+          <label>Mutation</label>
+          <input type="number" id="mutation-rate" value="0.05" min="0.01" max="0.2" step="0.01">
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-group">
+      <div class="setup-group-title">Seed</div>
+      <div class="setup-field" style="margin-bottom:0;">
+        <input type="text" id="rng-seed" value="" placeholder="Leave blank for random seed, or type a word / number">
+      </div>
+    </div>
+
+    <button id="start-btn">BEGIN SIMULATION</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- GAME UI                                -->
+<!-- ═══════════════════════════════════════ -->
+<div id="topbar">
+  <div class="title">LURCHES</div>
+  <div class="stats">
+    Round: <span id="round-num">0</span> &nbsp;│&nbsp;
+    Pop: <span id="pop-num">0</span> &nbsp;│&nbsp;
+    Births: <span id="birth-num">0</span> &nbsp;│&nbsp;
+    Deaths: <span id="death-num">0</span> &nbsp;│&nbsp;
+    Avg Age: <span id="avg-age">0</span> &nbsp;│&nbsp;
+    Food: <span id="food-pct">0%</span>
+  </div>
+  <div class="controls">
+    <button id="pause-btn" title="Space">⏸ Pause</button>
+    <button id="speed-down" title="-">−</button>
+    <span id="speed-display">1x</span>
+    <button id="speed-up" title="+">+</button>
+    <button id="god-btn" title="G">⚡ God</button>
+    <button id="help-btn" title="?">? Help</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="grid-container">
+    <canvas id="grid-canvas"></canvas>
+    <div id="grid-overlay"></div>
+    <div id="godmode-panel">
+      <h2>⚡ GOD MODE ⚡</h2>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:6px 8px;background:#1a1a28;border-radius:4px;">
+        <span style="color:#8888aa;font-size:11px;white-space:nowrap;">Severity</span>
+        <input type="range" id="god-severity" min="1" max="10" value="5" style="flex:1;accent-color:#aa44aa;height:4px;">
+        <span id="god-severity-val" style="color:#dd88dd;font-size:13px;min-width:22px;text-align:center;font-weight:bold;">5</span>
+      </div>
+      <div class="panel-title">Environmental Events</div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="drought"><kbd>1</kbd> Drought</button>
+        <button class="gm-btn" data-event="flood"><kbd>2</kbd> Flood</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="wildfire"><kbd>3</kbd> Wildfire</button>
+        <button class="gm-btn" data-event="earthquake"><kbd>4</kbd> Earthquake</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="iceage"><kbd>5</kbd> Ice Age</button>
+        <button class="gm-btn" data-event="meteor"><kbd>6</kbd> Meteor</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="fertile"><kbd>0</kbd> Fertile Season</button>
+      </div>
+      <div class="gm-divider"></div>
+      <div class="panel-title">Biological Events</div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="virus"><kbd>7</kbd> Virus</button>
+        <button class="gm-btn" data-event="plague"><kbd>8</kbd> Plague</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="mutationburst"><kbd>9</kbd> Mutation Burst</button>
+        <button class="gm-btn" data-event="fertwave"><kbd>F</kbd> Fertility Wave</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="bottleneck"><kbd>B</kbd> Bottleneck (kill 50%)</button>
+        <button class="gm-btn" data-event="rejuvenation"><kbd>R</kbd> Rejuvenation</button>
+      </div>
+      <div class="gm-divider"></div>
+      <div class="panel-title">Direct — click grid to target</div>
+      <div class="gm-row">
+        <button class="gm-btn" data-tool="smite"><kbd>L</kbd> Smite ⚡</button>
+        <button class="gm-btn" data-tool="bless"><kbd>V</kbd> Bless ✨</button>
+      </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-tool="food"><kbd>P</kbd> Place Food</button>
+        <button class="gm-btn" data-tool="wall"><kbd>W</kbd> Build Wall</button>
+      </div>
+      <div style="margin-top:10px;text-align:center;color:#666688;font-size:11px;">
+        Press <kbd>G</kbd> or <kbd>ESC</kbd> to close
+      </div>
+    </div>
+  </div>
+
+  <div id="sidepanel">
+    <div class="panel-section" id="inspector-panel">
+      <div class="panel-title">Lurch Inspector</div>
+      <div id="inspector-content" style="color:#555577;font-size:12px;">
+        Click a Lurch on the grid to inspect
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Population</div>
+      <canvas id="sparkline-canvas" height="40"></canvas>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Dominant Traits</div>
+      <div id="trait-distribution"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Active Events</div>
+      <div id="active-events" style="color:#555577;font-size:12px;">None</div>
+    </div>
+    <div class="panel-section" id="timeline-section">
+      <div class="panel-title timeline-toggle" id="timeline-toggle">Timeline <span style="font-size:10px;">▼</span></div>
+      <div id="timeline-content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="bottombar">
+  <div id="event-log"></div>
+  <div id="hotkeys">
+    <kbd>Space</kbd> Pause &nbsp;
+    <kbd>+/-</kbd> Speed &nbsp;
+    <kbd>G</kbd> God Mode &nbsp;
+    <kbd>N</kbd> Step &nbsp;
+    <kbd>F</kbd> Follow &nbsp;
+    <kbd>Click</kbd> Inspect &nbsp;
+    <kbd>Arrow Keys</kbd> Scroll &nbsp;
+    <kbd>?</kbd> Help
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- HELP OVERLAY                           -->
+<!-- ═══════════════════════════════════════ -->
+<div id="help-overlay">
+  <div id="help-card">
+    <div class="help-header">
+      <h2>LURCHES — GUIDE</h2>
+      <button id="help-close">✕</button>
+    </div>
+    <div class="help-tabs">
+      <button class="help-tab active" data-tab="overview">Overview</button>
+      <button class="help-tab" data-tab="terrain">Terrain</button>
+      <button class="help-tab" data-tab="lurches">Lurches</button>
+      <button class="help-tab" data-tab="genetics">Genetics</button>
+      <button class="help-tab" data-tab="ai">Intelligence</button>
+      <button class="help-tab" data-tab="godmode">God Mode</button>
+      <button class="help-tab" data-tab="controls">Controls</button>
+    </div>
+    <div class="help-body" id="help-body">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- GAME ENGINE                            -->
+<!-- ═══════════════════════════════════════ -->
+<script>
+// ============================================================
+// SEEDED RNG (mulberry32)
+// ============================================================
+class SeededRNG {
+  constructor(seed) {
+    this.seed = seed | 0;
+    this.state = seed | 0;
+  }
+  next() {
+    let t = this.state += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  // 0 to max-1
+  nextInt(max) { return Math.floor(this.next() * max); }
+  // min to max inclusive
+  range(min, max) { return min + this.next() * (max - min); }
+  // Normal distribution (Box-Muller)
+  gaussian(mean = 0, std = 1) {
+    const u1 = this.next();
+    const u2 = this.next();
+    return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.0001)) * Math.cos(2 * Math.PI * u2);
+  }
+  // Pick from array
+  pick(arr) { return arr[this.nextInt(arr.length)]; }
+  // Shuffle array in place
+  shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = this.nextInt(i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+}
+
+// ============================================================
+// TERRAIN DEFINITIONS
+// ============================================================
+const TERRAIN = {
+  DEEP_WATER:  { id: 0, char: '~', name: 'Deep Water', foodRegen: 3, moveCost: 4, safety: 2, visibility: 5, color: '#2255aa', bgColor: '#0a1a33', drowning: true },
+  PLAINS:      { id: 1, char: '.', name: 'Plains',     foodRegen: 2, moveCost: 1, safety: 2, visibility: 5, color: '#7a8a5a', bgColor: '#1a1e14' },
+  FOREST:      { id: 2, char: '#', name: 'Forest',     foodRegen: 4, moveCost: 2, safety: 4, visibility: 2, color: '#3a7a3a', bgColor: '#0e1e0e' },
+  MOUNTAIN:    { id: 3, char: '^', name: 'Mountain',   foodRegen: 1, moveCost: 4, safety: 5, visibility: 5, color: '#8a8a8a', bgColor: '#1e1e1e' },
+  SWAMP:       { id: 4, char: '"', name: 'Swamp',      foodRegen: 3, moveCost: 3, safety: 1, visibility: 2, color: '#5a7a3a', bgColor: '#141e0e', disease: true },
+  DESERT:      { id: 5, char: '░', name: 'Desert',     foodRegen: 0, moveCost: 2, safety: 3, visibility: 5, color: '#ba8a3a', bgColor: '#1e1608' },
+  SHALLOWS:    { id: 6, char: '≈', name: 'Shallows',   foodRegen: 2, moveCost: 2, safety: 3, visibility: 5, color: '#4a99aa', bgColor: '#0e1a20' },
+  RUINS:       { id: 7, char: '♠', name: 'Ruins',      foodRegen: 1, moveCost: 1, safety: 2, visibility: 2, color: '#7a5a8a', bgColor: '#14101a' },
+  WALL:        { id: 8, char: '█', name: 'Wall',       foodRegen: 0, moveCost: 99, safety: 10, visibility: 0, color: '#555555', bgColor: '#222222', impassable: true },
+};
+const TERRAIN_BY_ID = Object.values(TERRAIN);
+const TERRAIN_IDS = Object.keys(TERRAIN);
+
+// ============================================================
+// GENE DEFINITIONS
+// ============================================================
+const GENES = ['vitality','speed','strength','intelligence','fertility','adaptability','perception','size'];
+const GENE_COLORS = {
+  vitality:     '#44ff44',
+  speed:        '#44ffff',
+  strength:     '#ff4444',
+  intelligence: '#4488ff',
+  fertility:    '#ff44ff',
+  adaptability: '#ffff44',
+  perception:   '#cccccc',
+  size:         '#ffffff',
+};
+const GENE_SHORT = { vitality:'VIT', speed:'SPD', strength:'STR', intelligence:'INT', fertility:'FER', adaptability:'ADP', perception:'PER', size:'SIZ' };
+
+// ============================================================
+// CONFIG
+// ============================================================
+const CONFIG = {
+  gridW: 80,
+  gridH: 40,
+  population: 40,
+  mutationRate: 0.05,
+  macroMutationChance: 0.02,
+  foodCap: 10,
+  baseFoodStart: 5,
+  hungerPerRound: 1.5,
+  energyPerRound: -0.5,
+  sleepEnergyGain: 15,
+  eatHungerReduce: 25,
+  fightEnergyCost: 10,
+  reproduceEnergyCost: 20,
+  hideEnergyCost: 2,
+  juvenileDuration: 10,
+  starvationThreshold: 100,
+  diseaseChance: 0.05,
+  diseaseDamage: 5,
+  drownChance: 0.3,
+  desertEnergyDrain: 5,
+  kinSimilarityThreshold: 0.7,
+  maxLifespan: 200,
+  baseLifespan: 80,
+  speedLevels: [500, 250, 100, 50, 20],
+  speedLabels: ['1x', '2x', '5x', '10x', 'Max'],
+};
+
+// ============================================================
+// LURCH ID COUNTER
+// ============================================================
+let nextLurchId = 1;
+
+// ============================================================
+// WORLD
+// ============================================================
+class World {
+  constructor(w, h, rng) {
+    this.w = w;
+    this.h = h;
+    this.rng = rng;
+    this.terrain = new Array(w * h);
+    this.food = new Float32Array(w * h);
+    this.lurches = [];
+    this.lurchGrid = new Array(w * h).fill(null); // quick lookup: cell → lurch
+  }
+
+  idx(x, y) { return this.wrapY(y) * this.w + this.wrapX(x); }
+  wrapX(x) { return ((x % this.w) + this.w) % this.w; }
+  wrapY(y) { return ((y % this.h) + this.h) % this.h; }
+  wrap(x, y) { return [this.wrapX(x), this.wrapY(y)]; }
+
+  getTerrain(x, y) { return this.terrain[this.idx(x, y)]; }
+  setTerrain(x, y, t) { this.terrain[this.idx(x, y)] = t; }
+  getFood(x, y) { return this.food[this.idx(x, y)]; }
+  setFood(x, y, v) { this.food[this.idx(x, y)] = Math.max(0, Math.min(CONFIG.foodCap, v)); }
+  getLurch(x, y) { return this.lurchGrid[this.idx(x, y)]; }
+
+  placeLurch(lurch) {
+    const i = this.idx(lurch.x, lurch.y);
+    this.lurchGrid[i] = lurch;
+  }
+  removeLurch(lurch) {
+    const i = this.idx(lurch.x, lurch.y);
+    if (this.lurchGrid[i] === lurch) this.lurchGrid[i] = null;
+  }
+  moveLurch(lurch, nx, ny) {
+    this.removeLurch(lurch);
+    lurch.x = this.wrapX(nx);
+    lurch.y = this.wrapY(ny);
+    this.placeLurch(lurch);
+  }
+
+  // Toroidal distance
+  dist(x1, y1, x2, y2) {
+    const dx = Math.min(Math.abs(x1 - x2), this.w - Math.abs(x1 - x2));
+    const dy = Math.min(Math.abs(y1 - y2), this.h - Math.abs(y1 - y2));
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  chebyshev(x1, y1, x2, y2) {
+    const dx = Math.min(Math.abs(x1 - x2), this.w - Math.abs(x1 - x2));
+    const dy = Math.min(Math.abs(y1 - y2), this.h - Math.abs(y1 - y2));
+    return Math.max(dx, dy);
+  }
+
+  // Get neighbors (8-directional), wrapped
+  neighbors8(x, y) {
+    const n = [];
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if (dx !== 0 || dy !== 0)
+          n.push([this.wrapX(x + dx), this.wrapY(y + dy)]);
+    return n;
+  }
+
+  // Find empty adjacent cell
+  emptyAdjacent(x, y) {
+    const cells = this.rng.shuffle(this.neighbors8(x, y));
+    for (const [cx, cy] of cells) {
+      const t = this.getTerrain(cx, cy);
+      if (!t.impassable && !this.getLurch(cx, cy)) return [cx, cy];
+    }
+    return null;
+  }
+
+  // Regenerate food
+  regenFood(foodMultiplier = 1) {
+    for (let i = 0; i < this.w * this.h; i++) {
+      const t = this.terrain[i];
+      if (this.food[i] < CONFIG.foodCap) {
+        this.food[i] = Math.min(CONFIG.foodCap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier);
+      }
+    }
+  }
+
+  // Cells in radius (toroidal)
+  cellsInRadius(cx, cy, r) {
+    const cells = [];
+    const ri = Math.ceil(r);
+    for (let dy = -ri; dy <= ri; dy++) {
+      for (let dx = -ri; dx <= ri; dx++) {
+        if (dx * dx + dy * dy <= r * r) {
+          cells.push([this.wrapX(cx + dx), this.wrapY(cy + dy)]);
+        }
+      }
+    }
+    return cells;
+  }
+}
+
+// ============================================================
+// MAP GENERATION
+// ============================================================
+function generateMap(world, preset, rng) {
+  const { w, h } = world;
+
+  // Simple value noise for organic shapes
+  function noise2D(x, y, freq) {
+    // Hash-based noise
+    const ix = Math.floor(x * freq);
+    const iy = Math.floor(y * freq);
+    const fx = x * freq - ix;
+    const fy = y * freq - iy;
+    const hash = (a, b) => {
+      let h = a * 374761393 + b * 668265263 + rng.seed;
+      h = (h ^ (h >> 13)) * 1274126177;
+      return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+    };
+    const v00 = hash(ix, iy);
+    const v10 = hash(ix+1, iy);
+    const v01 = hash(ix, iy+1);
+    const v11 = hash(ix+1, iy+1);
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    return (v00*(1-sx)*(1-sy) + v10*sx*(1-sy) + v01*(1-sx)*sy + v11*sx*sy);
+  }
+
+  function multiNoise(x, y) {
+    return noise2D(x, y, 0.05) * 0.5 + noise2D(x, y, 0.12) * 0.3 + noise2D(x, y, 0.25) * 0.2;
+  }
+
+  // Presets
+  const presets = {
+    random() {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const v = multiNoise(x, y);
+          let t;
+          if (v < 0.15) t = TERRAIN.DEEP_WATER;
+          else if (v < 0.25) t = TERRAIN.SHALLOWS;
+          else if (v < 0.45) t = TERRAIN.PLAINS;
+          else if (v < 0.6) t = TERRAIN.FOREST;
+          else if (v < 0.72) t = TERRAIN.SWAMP;
+          else if (v < 0.82) t = TERRAIN.MOUNTAIN;
+          else if (v < 0.9) t = TERRAIN.DESERT;
+          else t = TERRAIN.RUINS;
+          world.setTerrain(x, y, t);
+        }
+      }
+    },
+    pangaea() {
+      const cx = w / 2, cy = h / 2;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const d = world.dist(x, y, cx, cy) / Math.min(w, h);
+          const v = multiNoise(x, y) - d * 1.2;
+          let t;
+          if (v < -0.15) t = TERRAIN.DEEP_WATER;
+          else if (v < -0.05) t = TERRAIN.SHALLOWS;
+          else if (v < 0.15) t = TERRAIN.PLAINS;
+          else if (v < 0.28) t = TERRAIN.FOREST;
+          else if (v < 0.35) t = TERRAIN.SWAMP;
+          else if (v < 0.42) t = TERRAIN.MOUNTAIN;
+          else if (v < 0.48) t = TERRAIN.DESERT;
+          else t = TERRAIN.RUINS;
+          world.setTerrain(x, y, t);
+        }
+      }
+    },
+    eden() {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const v = multiNoise(x, y);
+          let t;
+          if (v < 0.08) t = TERRAIN.SHALLOWS;
+          else if (v < 0.5) t = TERRAIN.FOREST;
+          else if (v < 0.8) t = TERRAIN.PLAINS;
+          else t = TERRAIN.SWAMP;
+          world.setTerrain(x, y, t);
+        }
+      }
+    },
+    crucible() {
+      const cx = w / 2, cy = h / 2;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const d = world.dist(x, y, cx, cy);
+          if (d < 5) {
+            world.setTerrain(x, y, rng.next() < 0.6 ? TERRAIN.FOREST : TERRAIN.PLAINS);
+          } else if (d < 8) {
+            world.setTerrain(x, y, rng.next() < 0.3 ? TERRAIN.PLAINS : TERRAIN.DESERT);
+          } else {
+            world.setTerrain(x, y, TERRAIN.DESERT);
+          }
+        }
+      }
+    },
+    archipelago() {
+      // Scatter islands
+      const islands = [];
+      for (let i = 0; i < 8 + rng.nextInt(6); i++) {
+        islands.push({ x: rng.nextInt(w), y: rng.nextInt(h), r: 3 + rng.nextInt(6) });
+      }
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let minD = Infinity;
+          for (const isl of islands) {
+            minD = Math.min(minD, world.dist(x, y, isl.x, isl.y) - isl.r);
+          }
+          const v = noise2D(x, y, 0.15) * 3;
+          const elevation = -minD + v;
+          let t;
+          if (elevation < -3) t = TERRAIN.DEEP_WATER;
+          else if (elevation < 0) t = TERRAIN.SHALLOWS;
+          else if (elevation < 2) t = TERRAIN.PLAINS;
+          else if (elevation < 4) t = TERRAIN.FOREST;
+          else t = TERRAIN.MOUNTAIN;
+          world.setTerrain(x, y, t);
+        }
+      }
+    },
+    ringworld() {
+      const cx = w / 2, cy = h / 2;
+      const innerR = Math.min(w, h) * 0.15;
+      const outerR = Math.min(w, h) * 0.45;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const d = world.dist(x, y, cx, cy);
+          const v = noise2D(x, y, 0.12);
+          if (d < innerR) {
+            world.setTerrain(x, y, rng.next() < 0.3 ? TERRAIN.DEEP_WATER : TERRAIN.DESERT);
+          } else if (d < innerR + 3) {
+            world.setTerrain(x, y, TERRAIN.MOUNTAIN);
+          } else if (d < outerR) {
+            const band = (d - innerR) / (outerR - innerR);
+            if (v < 0.3) world.setTerrain(x, y, TERRAIN.FOREST);
+            else if (v < 0.5) world.setTerrain(x, y, TERRAIN.PLAINS);
+            else if (v < 0.65) world.setTerrain(x, y, TERRAIN.SWAMP);
+            else world.setTerrain(x, y, TERRAIN.RUINS);
+          } else {
+            world.setTerrain(x, y, TERRAIN.DEEP_WATER);
+          }
+        }
+      }
+    },
+    waterworld() {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const v = multiNoise(x, y);
+          let t;
+          if (v < 0.55) t = TERRAIN.DEEP_WATER;
+          else if (v < 0.65) t = TERRAIN.SHALLOWS;
+          else if (v < 0.75) t = TERRAIN.PLAINS;
+          else if (v < 0.85) t = TERRAIN.FOREST;
+          else t = TERRAIN.MOUNTAIN;
+          world.setTerrain(x, y, t);
+        }
+      }
+    }
+  };
+
+  (presets[preset] || presets.random)();
+
+  // Initialize food
+  for (let i = 0; i < w * h; i++) {
+    world.food[i] = Math.min(CONFIG.foodCap, world.terrain[i].foodRegen * 1.5 + rng.next() * 2);
+  }
+}
+
+// ============================================================
+// LURCH MODEL
+// ============================================================
+class Lurch {
+  constructor(id, x, y, genome, parentA = null, parentB = null) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.genome = genome; // { vitality, speed, strength, intelligence, fertility, adaptability, perception, size }
+    this.parentA = parentA;
+    this.parentB = parentB;
+    this.children = [];
+
+    // Derived stats
+    this.maxHP = 40 + genome.vitality * 60 + genome.size * 30;
+    this.hp = this.maxHP;
+    this.hunger = 20;
+    this.energy = 80;
+    this.stress = 0;
+    this.age = 0;
+    this.maxAge = CONFIG.baseLifespan + genome.vitality * CONFIG.maxLifespan;
+    this.juvenile = true;
+    this.juvenileTimer = CONFIG.juvenileDuration;
+    this.alive = true;
+    this.causeOfDeath = null;
+    this.reproCooldown = 0; // Rounds until can breed again
+
+    // State
+    this.lastAction = 'none';
+    this.diseased = false;
+    this.diseaseTurns = 0;
+    this.warned = false; // kin warning flag
+    this.hidden = false;
+    this.sleeping = false;
+
+    // Track birth round
+    this.birthRound = 0;
+
+    // Visual
+    this.dominantGene = this.getDominantGene();
+  }
+
+  getDominantGene() {
+    let best = GENES[0], bestVal = this.genome[GENES[0]];
+    for (const g of GENES) {
+      if (this.genome[g] > bestVal) { best = g; bestVal = this.genome[g]; }
+    }
+    return best;
+  }
+
+  get color() { return GENE_COLORS[this.dominantGene]; }
+
+  get healthState() {
+    const pct = this.hp / this.maxHP;
+    const hungerPct = this.hunger / CONFIG.starvationThreshold;
+    if (this.sleeping) return 'sleeping';
+    if (pct < 0.15 || hungerPct > 0.9) return 'critical';
+    if (pct < 0.4 || hungerPct > 0.7) return 'dim';
+    if (pct > 0.7 && hungerPct < 0.3) return 'bright';
+    return 'normal';
+  }
+
+  get effectiveInt() {
+    const stressPenalty = this.stress / 100 * 0.8;
+    return Math.max(0, this.genome.intelligence - stressPenalty);
+  }
+
+  get perceptionRange() {
+    return 2 + Math.floor(this.genome.perception * 6);
+  }
+
+  get moveSpeed() {
+    return 1 + Math.floor(this.genome.speed * 2);
+  }
+
+  genomeSimilarity(other) {
+    let sum = 0;
+    for (const g of GENES) {
+      sum += 1 - Math.abs(this.genome[g] - other.genome[g]);
+    }
+    return sum / GENES.length;
+  }
+}
+
+// ============================================================
+// GENETICS
+// ============================================================
+const Genetics = {
+  createGenome(means, variance, rng) {
+    const genome = {};
+    for (const g of GENES) {
+      const mean = means[g] ?? 0.5;
+      const v = rng.gaussian(mean, variance);
+      genome[g] = Math.max(0, Math.min(1, v));
+    }
+    return genome;
+  },
+
+  crossover(genomeA, genomeB, rng) {
+    const child = {};
+    for (const g of GENES) {
+      // Weighted blend, not just average
+      const w = rng.range(0.2, 0.8);
+      child[g] = genomeA[g] * w + genomeB[g] * (1 - w);
+    }
+    return child;
+  },
+
+  mutate(genome, rate, rng) {
+    const result = { ...genome };
+    for (const g of GENES) {
+      // Normal mutation
+      if (rng.next() < rate) {
+        result[g] += rng.gaussian(0, 0.08);
+      }
+      // Macro-mutation
+      if (rng.next() < CONFIG.macroMutationChance) {
+        result[g] = rng.next(); // completely random new value
+      }
+      result[g] = Math.max(0, Math.min(1, result[g]));
+    }
+    return result;
+  },
+
+  reproduce(parentA, parentB, rng) {
+    const blended = Genetics.crossover(parentA.genome, parentB.genome, rng);
+    const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
+    return mutated;
+  }
+};
+
+// ============================================================
+// LURCH PRESETS
+// ============================================================
+const LURCH_PRESETS = {
+  balanced:    { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, fertility:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.15 },
+  warriors:    { means: { vitality:0.7, speed:0.5, strength:0.8, intelligence:0.3, fertility:0.3, adaptability:0.4, perception:0.5, size:0.7 }, variance: 0.12 },
+  thinkers:    { means: { vitality:0.4, speed:0.3, strength:0.2, intelligence:0.8, fertility:0.4, adaptability:0.5, perception:0.7, size:0.3 }, variance: 0.12 },
+  breeders:    { means: { vitality:0.4, speed:0.4, strength:0.3, intelligence:0.3, fertility:0.9, adaptability:0.6, perception:0.4, size:0.3 }, variance: 0.12 },
+  chaos:       { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, fertility:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.35 },
+  specialists: null, // handled specially
+};
+
+// ============================================================
+// DECISION ENGINE
+// ============================================================
+const DecisionEngine = {
+  decide(lurch, world) {
+    const eInt = lurch.effectiveInt;
+
+    // Sleeping lurches wake up if threatened or hungry
+    if (lurch.sleeping) {
+      if (lurch.energy >= 90 || lurch.hunger > 60 || lurch.stress > 50) {
+        lurch.sleeping = false;
+      } else {
+        return { action: 'sleep' };
+      }
+    }
+
+    // Tier determination
+    if (eInt < 0.2) return DecisionEngine.instinctive(lurch, world);
+    if (eInt < 0.5) return DecisionEngine.aware(lurch, world);
+    if (eInt < 0.8) return DecisionEngine.strategic(lurch, world);
+    return DecisionEngine.brilliant(lurch, world);
+  },
+
+  // Scan surroundings for food, threats, mates
+  scan(lurch, world, range) {
+    const foods = [];
+    const threats = [];
+    const mates = [];
+    const empty = [];
+
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const [nx, ny] = world.wrap(lurch.x + dx, lurch.y + dy);
+        const other = world.getLurch(nx, ny);
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        const food = world.getFood(nx, ny);
+
+        if (other && other.alive) {
+          if (other.genome.strength > lurch.genome.strength * 0.8) {
+            threats.push({ lurch: other, x: nx, y: ny, dist: d });
+          }
+          if (!lurch.juvenile && !other.juvenile && d <= 1) {
+            mates.push({ lurch: other, x: nx, y: ny });
+          }
+        }
+        if (!other && food > 1 && !world.getTerrain(nx, ny).impassable) {
+          foods.push({ x: nx, y: ny, food, dist: d });
+        }
+        if (!other && !world.getTerrain(nx, ny).impassable && d <= 1) {
+          empty.push({ x: nx, y: ny });
+        }
+      }
+    }
+    return { foods, threats, mates, empty };
+  },
+
+  // Direction toward a target (toroidal)
+  directionTo(world, fx, fy, tx, ty) {
+    let dx = tx - fx;
+    let dy = ty - fy;
+    if (Math.abs(dx) > world.w / 2) dx -= Math.sign(dx) * world.w;
+    if (Math.abs(dy) > world.h / 2) dy -= Math.sign(dy) * world.h;
+    return [Math.sign(dx), Math.sign(dy)];
+  },
+
+  instinctive(lurch, world) {
+    const { foods, threats, mates } = this.scan(lurch, world, 2);
+
+    // If very hungry, eat if food here
+    if (lurch.hunger > 50 && world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+
+    // If very low energy, sleep
+    if (lurch.energy < 15) return { action: 'sleep' };
+
+    // Fight or flee from adjacent threat (coin flip)
+    if (threats.length > 0 && threats[0].dist <= 1) {
+      return world.rng.next() < 0.5 ? { action: 'fight', target: threats[0].lurch } : { action: 'move', dir: this.directionTo(world, lurch.x, lurch.y, threats[0].x, threats[0].y).map(d => -d) };
+    }
+
+    // Mate with anyone adjacent
+    if (!lurch.juvenile && mates.length > 0 && lurch.energy > 30 && lurch.hunger < 70) {
+      return { action: 'reproduce', mate: world.rng.pick(mates).lurch };
+    }
+
+    // Random movement
+    if (world.rng.next() < 0.6) {
+      return { action: 'move', dir: [world.rng.nextInt(3) - 1, world.rng.nextInt(3) - 1] };
+    }
+
+    return { action: 'nothing' };
+  },
+
+  aware(lurch, world) {
+    const scan = this.scan(lurch, world, 3);
+
+    // Flee from stronger threats
+    if (scan.threats.length > 0 && scan.threats[0].dist <= 2) {
+      if (lurch.hp / lurch.maxHP < 0.5 || lurch.genome.strength < scan.threats[0].lurch.genome.strength) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.threats[0].x, scan.threats[0].y);
+        return lurch.energy > CONFIG.hideEnergyCost + 5 ? { action: 'hide' } : { action: 'move', dir: [-dx, -dy] };
+      }
+    }
+
+    // Eat if hungry and food here
+    if (lurch.hunger > 40 && world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+
+    // Move toward visible food
+    if (lurch.hunger > 30 && scan.foods.length > 0) {
+      scan.foods.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.foods[0].x, scan.foods[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // Sleep if tired
+    if (lurch.energy < 25) return { action: 'sleep' };
+
+    // Reproduce
+    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35 && lurch.hunger < 60) {
+      return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
+    }
+
+    // Wander
+    return { action: 'move', dir: [world.rng.nextInt(3) - 1, world.rng.nextInt(3) - 1] };
+  },
+
+  strategic(lurch, world) {
+    const range = lurch.perceptionRange;
+    const scan = this.scan(lurch, world, range);
+
+    // Retreat to safe terrain if injured
+    if (lurch.hp / lurch.maxHP < 0.4) {
+      const terrain = world.getTerrain(lurch.x, lurch.y);
+      if (terrain.safety < 3) {
+        // Find safer terrain
+        for (const f of scan.foods) {
+          if (world.getTerrain(f.x, f.y).safety >= 4) {
+            const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, f.x, f.y);
+            return { action: 'move', dir: [dx, dy] };
+          }
+        }
+      }
+      if (lurch.energy < 20) return { action: 'sleep' };
+      return { action: 'hide' };
+    }
+
+    // Evaluate threats — flee if outmatched
+    if (scan.threats.length > 0) {
+      const threat = scan.threats[0];
+      if (threat.dist <= 2 && threat.lurch.genome.strength > lurch.genome.strength * 1.1) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, threat.x, threat.y);
+        return { action: 'move', dir: [-dx, -dy] };
+      }
+    }
+
+    // Eat strategically (wait for good food cells)
+    if (lurch.hunger > 35 && world.getFood(lurch.x, lurch.y) > 2) return { action: 'eat' };
+
+    // Pathfind toward food-rich areas
+    if (lurch.hunger > 25) {
+      scan.foods.sort((a, b) => b.food - a.food);
+      if (scan.foods.length > 0) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.foods[0].x, scan.foods[0].y);
+        return { action: 'move', dir: [dx, dy] };
+      }
+    }
+
+    // Stockpile energy before reproducing
+    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 50 && lurch.hunger < 50) {
+      // Prefer higher-stat mates
+      scan.mates.sort((a, b) => {
+        const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
+        const sb = GENES.reduce((s, g) => s + a.lurch.genome[g], 0);
+        return sa - sb;
+      });
+      return { action: 'reproduce', mate: scan.mates[0].lurch };
+    }
+
+    if (lurch.energy < 30) return { action: 'sleep' };
+
+    // Wander toward food areas
+    if (scan.foods.length > 0) {
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.foods[0].x, scan.foods[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    return { action: 'move', dir: [world.rng.nextInt(3) - 1, world.rng.nextInt(3) - 1] };
+  },
+
+  brilliant(lurch, world) {
+    const range = lurch.perceptionRange + 2;
+    const scan = this.scan(lurch, world, range);
+    const terrain = world.getTerrain(lurch.x, lurch.y);
+
+    // Avoid swamp disease
+    if (terrain.disease && !lurch.diseased && lurch.genome.adaptability < 0.6) {
+      for (const c of scan.empty || this.scan(lurch, world, 2).empty) {
+        const t = world.getTerrain(c.x, c.y);
+        if (!t.disease) {
+          const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, c.x, c.y);
+          return { action: 'move', dir: [dx, dy] };
+        }
+      }
+    }
+
+    // Avoid desert without energy reserves
+    if (terrain === TERRAIN.DESERT && lurch.energy < 40) {
+      for (const f of scan.foods) {
+        const t = world.getTerrain(f.x, f.y);
+        if (t !== TERRAIN.DESERT) {
+          const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, f.x, f.y);
+          return { action: 'move', dir: [dx, dy] };
+        }
+      }
+    }
+
+    // Smart threat assessment
+    if (scan.threats.length > 0) {
+      const threat = scan.threats[0];
+      // Only fight if we have significant advantage
+      if (threat.dist <= 1 && lurch.genome.strength > threat.lurch.genome.strength * 1.3 && lurch.hp / lurch.maxHP > 0.6) {
+        return { action: 'fight', target: threat.lurch };
+      }
+      // Otherwise retreat smartly
+      if (threat.dist <= 3) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, threat.x, threat.y);
+        // Move to safe terrain while fleeing
+        return { action: 'move', dir: [-dx, -dy] };
+      }
+    }
+
+    // Optimal eating
+    if (lurch.hunger > 30 && world.getFood(lurch.x, lurch.y) > 3) return { action: 'eat' };
+
+    // Find best food considering terrain safety
+    if (lurch.hunger > 20) {
+      const scored = scan.foods.map(f => ({
+        ...f,
+        score: f.food * world.getTerrain(f.x, f.y).safety / (f.dist + 1)
+      })).sort((a, b) => b.score - a.score);
+      if (scored.length > 0) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scored[0].x, scored[0].y);
+        return { action: 'move', dir: [dx, dy] };
+      }
+    }
+
+    // Reproduce with optimal mates (complementary stats)
+    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 55 && lurch.hunger < 45) {
+      const scored = scan.mates.map(m => {
+        let score = 0;
+        for (const g of GENES) score += m.lurch.genome[g];
+        // Prefer complementary (different dominant gene)
+        if (m.lurch.dominantGene !== lurch.dominantGene) score += 1;
+        return { ...m, score };
+      }).sort((a, b) => b.score - a.score);
+      return { action: 'reproduce', mate: scored[0].lurch };
+    }
+
+    // Kin warning: emit danger signal
+    if (scan.threats.length > 0 && lurch.genome.intelligence >= 0.6) {
+      // Flag nearby kin
+      for (const cell of world.cellsInRadius(lurch.x, lurch.y, lurch.perceptionRange)) {
+        const other = world.getLurch(cell[0], cell[1]);
+        if (other && other !== lurch && other.alive && lurch.genomeSimilarity(other) > CONFIG.kinSimilarityThreshold) {
+          other.warned = true;
+        }
+      }
+    }
+
+    if (lurch.energy < 35) return { action: 'sleep' };
+
+    // Territory behavior: return to known good area (high food, safe)
+    if (terrain.safety >= 4 && world.getFood(lurch.x, lurch.y) > 1) {
+      return { action: 'nothing' }; // Hold position
+    }
+
+    // Move toward promising areas
+    if (scan.foods.length > 0) {
+      const best = scan.foods.sort((a, b) => b.food * world.getTerrain(b.x, b.y).safety - a.food * world.getTerrain(a.x, a.y).safety)[0];
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    return { action: 'move', dir: [world.rng.nextInt(3) - 1, world.rng.nextInt(3) - 1] };
+  }
+};
+
+// ============================================================
+// EVENTS (GOD MODE)
+// ============================================================
+const Events = {
+  activeEvents: [],
+  vfx: [], // Visual effects: { type, x, y, ttl, maxTtl, radius? }
+
+  add(event) {
+    this.activeEvents.push(event);
+  },
+
+  addVfx(type, x, y, ttl, extra = {}) {
+    this.vfx.push({ type, x, y, ttl, maxTtl: ttl, ...extra });
+  },
+
+  tick(world, sim) {
+    this.activeEvents = this.activeEvents.filter(e => {
+      e.duration--;
+      if (e.tick) e.tick(world, sim);
+      return e.duration > 0;
+    });
+    // Decay VFX
+    this.vfx = this.vfx.filter(v => { v.ttl--; return v.ttl > 0; });
+  },
+
+  // Severity helper: scales a value. sev 1-10, 5 = default (1x).
+  // At sev 1 → 0.2x, sev 5 → 1x, sev 10 → 2x
+  sev(base) { const s = this._severity || 5; return base * (0.2 + (s - 1) * 0.2); },
+  sevInt(base) { return Math.max(1, Math.round(this.sev(base))); },
+
+  drought(world, sim) {
+    const dur = this.sevInt(50);
+    const mult = Math.max(0.05, 0.7 - this._severity * 0.06); // sev1=0.64, sev5=0.4, sev10=0.1
+    this.add({ name: 'Drought', duration: dur, tick(w) {}, foodMult: mult, vfxType: 'drought' });
+    sim.log(`DROUGHT [${this._severity}] — food regen ×${mult.toFixed(2)} for ${dur} rounds`, 'event');
+  },
+
+  flood(world, sim) {
+    const spreadChance = 0.15 + this._severity * 0.06; // 0.21 to 0.75
+    const waves = Math.ceil(this._severity / 3); // 1-4 waves of spreading
+    let totalFlooded = 0;
+    let kills = 0;
+
+    for (let wave = 0; wave < waves; wave++) {
+      const toConvert = [];
+      for (let y = 0; y < world.h; y++) {
+        for (let x = 0; x < world.w; x++) {
+          if (world.getTerrain(x, y) === TERRAIN.DEEP_WATER || world.getTerrain(x, y) === TERRAIN.SHALLOWS) {
+            for (const [nx, ny] of world.neighbors8(x, y)) {
+              const t = world.getTerrain(nx, ny);
+              if (t !== TERRAIN.DEEP_WATER && t !== TERRAIN.SHALLOWS && t !== TERRAIN.MOUNTAIN && t !== TERRAIN.WALL) {
+                if (world.rng.next() < spreadChance) toConvert.push([nx, ny]);
+              }
+            }
+          }
+        }
+      }
+      for (const [x, y] of toConvert) {
+        // Kill lurches caught in the flood
+        const l = world.getLurch(x, y);
+        if (l && l.alive) {
+          const killChance = 0.2 + this._severity * 0.06; // 0.26 to 0.8
+          if (world.rng.next() < killChance) {
+            l.hp = 0; l.causeOfDeath = 'flood'; kills++;
+          } else {
+            l.hp -= this.sevInt(20);
+          }
+        }
+        world.setTerrain(x, y, TERRAIN.SHALLOWS);
+        this.addVfx('flood', x, y, 30 + wave * 10);
+        totalFlooded++;
+      }
+    }
+    sim.log(`FLOOD [${this._severity}] — ${totalFlooded} cells flooded, ${kills} drowned (${waves} waves)`, 'event');
+  },
+
+  wildfire(world, sim) {
+    let sx, sy, attempts = 0;
+    do {
+      sx = world.rng.nextInt(world.w);
+      sy = world.rng.nextInt(world.h);
+      attempts++;
+    } while (world.getTerrain(sx, sy) !== TERRAIN.FOREST && attempts < 200);
+
+    const maxBurn = this.sevInt(80);
+    const spreadChance = 0.3 + this._severity * 0.05;
+    const burned = [];
+    const queue = [[sx, sy]];
+    const visited = new Set();
+    while (queue.length > 0 && burned.length < maxBurn) {
+      const [x, y] = queue.shift();
+      const key = `${x},${y}`;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (world.getTerrain(x, y) === TERRAIN.FOREST) {
+        world.setTerrain(x, y, TERRAIN.PLAINS);
+        world.setFood(x, y, 0);
+        burned.push([x, y]);
+        const l = world.getLurch(x, y);
+        if (l && l.alive) {
+          const burnDmg = this.sevInt(30);
+          if (this._severity >= 7 && world.rng.next() < 0.4 + this._severity * 0.04) {
+            l.hp = 0; l.causeOfDeath = 'wildfire';
+          } else {
+            l.hp -= burnDmg;
+          }
+        }
+        for (const [nx, ny] of world.neighbors8(x, y)) {
+          if (world.rng.next() < spreadChance) queue.push([nx, ny]);
+        }
+      }
+    }
+    // VFX: fire with perimeter/inner/wake zones
+    const burnedSet = new Set(burned.map(([x, y]) => `${x},${y}`));
+    for (const [bx, by] of burned) {
+      // Check if this cell is on the perimeter (has a non-burned neighbor)
+      let isPerimeter = false;
+      for (const [nx, ny] of world.neighbors8(bx, by)) {
+        if (!burnedSet.has(`${nx},${ny}`)) { isPerimeter = true; break; }
+      }
+      // Active fire: perimeter burns bright, inner smolders
+      this.addVfx('fire', bx, by, 30 + Math.floor(Math.random() * 20), { zone: isPerimeter ? 'perimeter' : 'inner' });
+      // Ash/wake: long-lasting dark char on all burned cells
+      this.addVfx('ash', bx, by, 80 + Math.floor(Math.random() * 40));
+    }
+    sim.log(`WILDFIRE [${this._severity}] — ${burned.length} forest cells burned`, 'event');
+  },
+
+  earthquake(world, sim) {
+    const cx = world.rng.nextInt(world.w);
+    const cy = world.rng.nextInt(world.h);
+    const radius = this.sevInt(10);
+    let changed = 0;
+    let kills = 0;
+    const terrainPool = [TERRAIN.PLAINS, TERRAIN.MOUNTAIN, TERRAIN.FOREST, TERRAIN.RUINS, TERRAIN.SWAMP];
+    for (const [x, y] of world.cellsInRadius(cx, cy, radius)) {
+      // Distance from epicenter (toroidal)
+      let dx = Math.abs(x - cx); if (dx > world.w / 2) dx = world.w - dx;
+      let dy = Math.abs(y - cy); if (dy > world.h / 2) dy = world.h - dy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distRatio = dist / Math.max(radius, 1); // 0 at center, 1 at edge
+
+      // Terrain scramble — higher chance near center
+      if (world.rng.next() < 0.8 - distRatio * 0.5) {
+        world.setTerrain(x, y, world.rng.pick(terrainPool));
+        changed++;
+      }
+
+      // Lurch damage — lethal at epicenter, decreasing with distance
+      const l = world.getLurch(x, y);
+      if (l && l.alive) {
+        const killChance = Math.max(0, (1 - distRatio * 0.8) * (this._severity / 10));
+        if (distRatio < 0.15) {
+          // Ground zero: instant kill at high severity
+          if (this._severity >= 7 || world.rng.next() < 0.8) {
+            l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
+          }
+        } else if (world.rng.next() < killChance) {
+          l.hp = 0; l.causeOfDeath = 'earthquake'; kills++;
+        } else {
+          // Damage falloff
+          l.hp -= Math.round(this.sevInt(30) * (1 - distRatio * 0.7));
+        }
+      }
+    }
+    // VFX: seismic pulse from epicenter
+    for (const [x, y] of world.cellsInRadius(cx, cy, radius)) {
+      this.addVfx('quake', x, y, 15 + Math.floor(Math.random() * 10));
+    }
+    sim.log(`EARTHQUAKE [${this._severity}] at (${cx},${cy}) — ${changed} cells scrambled, ${kills} killed`, 'event');
+  },
+
+  meteor(world, sim) {
+    const cx = world.rng.nextInt(world.w);
+    const cy = world.rng.nextInt(world.h);
+    const radius = Math.max(1, Math.round(1 + this._severity * 0.8));
+    let kills = 0;
+    for (const [x, y] of world.cellsInRadius(cx, cy, radius)) {
+      world.setTerrain(x, y, TERRAIN.DESERT);
+      world.setFood(x, y, 0);
+      const l = world.getLurch(x, y);
+      if (l && l.alive) { l.hp = 0; l.causeOfDeath = 'meteor'; kills++; }
+    }
+    // VFX: explosion/scorch at impact site
+    for (const [x, y] of world.cellsInRadius(cx, cy, radius)) {
+      this.addVfx('explosion', x, y, 40 + Math.floor(Math.random() * 20));
+    }
+    // Flash at epicenter
+    this.addVfx('explosion', cx, cy, 60);
+    sim.log(`METEOR [${this._severity}] at (${cx},${cy}) — radius ${radius}, ${kills} killed`, 'event');
+  },
+
+  iceage(world, sim) {
+    const dur = this.sevInt(80);
+    const mult = Math.max(0.05, 0.5 - this._severity * 0.04);
+    const coldDmg = Math.round(this._severity * 0.8);
+    this.add({
+      name: 'Ice Age', duration: dur, foodMult: mult, vfxType: 'iceage',
+      tick(w, s) {
+        // Cold damage every 5 rounds — hurts lurches with low vitality
+        if (s.round % 5 === 0) {
+          for (const l of w.lurches) {
+            if (!l.alive) continue;
+            const coldResist = l.genome.vitality * 0.7 + l.genome.size * 0.3;
+            if (w.rng.next() > coldResist) {
+              l.hp -= coldDmg;
+              if (l.hp <= 0) l.causeOfDeath = 'frostbite';
+            }
+          }
+        }
+      }
+    });
+    // Convert desert to plains (frozen)
+    for (let i = 0; i < world.w * world.h; i++) {
+      if (world.terrain[i] === TERRAIN.DESERT) {
+        world.terrain[i] = TERRAIN.PLAINS;
+      }
+    }
+    // Freeze some shallows
+    for (let i = 0; i < world.w * world.h; i++) {
+      if (world.terrain[i] === TERRAIN.SHALLOWS && world.rng.next() < 0.3 + this._severity * 0.05) {
+        world.terrain[i] = TERRAIN.PLAINS;
+      }
+    }
+    sim.log(`ICE AGE [${this._severity}] — food ×${mult.toFixed(2)} for ${dur} rounds, cold dmg ${coldDmg}/5rds`, 'event');
+  },
+
+  fertile(world, sim) {
+    const dur = this.sevInt(40);
+    const mult = 1 + this._severity * 0.3;
+    this.add({ name: 'Fertile Season', duration: dur, foodMult: mult });
+    sim.log(`FERTILE SEASON [${this._severity}] — food regen ×${mult.toFixed(1)} for ${dur} rounds`, 'event');
+  },
+
+  virus(world, sim) {
+    if (world.lurches.length === 0) return;
+    const patient0 = world.rng.pick(world.lurches.filter(l => l.alive));
+    if (!patient0) return;
+    patient0.diseased = true;
+    patient0.diseaseTurns = this.sevInt(20);
+    const spreadRate = 0.05 + this._severity * 0.03;
+    const dur = this.sevInt(30);
+    this.add({
+      name: 'Virus', duration: dur,
+      tick(w) {
+        for (const l of w.lurches) {
+          if (!l.alive || !l.diseased) continue;
+          for (const [nx, ny] of w.neighbors8(l.x, l.y)) {
+            const other = w.getLurch(nx, ny);
+            if (other && other.alive && !other.diseased && w.rng.next() < spreadRate * (1 - other.genome.adaptability)) {
+              other.diseased = true;
+              other.diseaseTurns = 10 + w.rng.nextInt(10);
+            }
+          }
+        }
+      }
+    });
+    sim.log(`VIRUS [${this._severity}] — Patient zero: Lurch #${patient0.id}`, 'event');
+  },
+
+  plague(world, sim) {
+    const threshold = 0.6 - this._severity * 0.03; // sev10 → 0.3 adaptability threshold
+    const chance = 0.3 + this._severity * 0.06;
+    let infected = 0;
+    for (const l of world.lurches) {
+      if (l.alive && l.genome.adaptability < threshold && world.rng.next() < chance) {
+        l.diseased = true;
+        l.diseaseTurns = this.sevInt(20);
+        infected++;
+      }
+    }
+    sim.log(`PLAGUE [${this._severity}] — ${infected} Lurches infected`, 'event');
+  },
+
+  mutationburst(world, sim) {
+    const dur = this.sevInt(30);
+    const mult = 1 + this._severity * 1.0; // sev1=2x, sev5=6x, sev10=11x
+    this.add({ name: 'Mutation Burst', duration: dur, mutMult: mult });
+    sim.log(`MUTATION BURST [${this._severity}] — mutation rate ×${mult.toFixed(0)} for ${dur} rounds`, 'event');
+  },
+
+  fertwave(world, sim) {
+    const boost = 0.05 + this._severity * 0.04; // 0.09 to 0.45
+    for (const l of world.lurches) {
+      if (l.alive) l.genome.fertility = Math.min(1, l.genome.fertility + boost);
+    }
+    sim.log(`FERTILITY WAVE [${this._severity}] — all Lurches +${boost.toFixed(2)} fertility`, 'event');
+  },
+
+  bottleneck(world, sim) {
+    const killChance = 0.1 + this._severity * 0.08; // 0.18 to 0.9
+    let kills = 0;
+    for (const l of world.lurches) {
+      if (l.alive && world.rng.next() < killChance) {
+        l.hp = 0;
+        l.causeOfDeath = 'bottleneck';
+        kills++;
+      }
+    }
+    sim.log(`GENETIC BOTTLENECK [${this._severity}] — ${kills} Lurches killed (${Math.round(killChance*100)}% chance)`, 'event');
+  },
+
+  rejuvenation(world, sim) {
+    const healPct = 0.2 + this._severity * 0.06;
+    const hungerReduce = 10 + this._severity * 5;
+    const energyGain = 10 + this._severity * 5;
+    for (const l of world.lurches) {
+      if (l.alive) {
+        l.hp = Math.min(l.maxHP, l.hp + l.maxHP * healPct);
+        l.hunger = Math.max(0, l.hunger - hungerReduce);
+        l.energy = Math.min(100, l.energy + energyGain);
+      }
+    }
+    sim.log(`REJUVENATION [${this._severity}] — all Lurches healed (${Math.round(healPct*100)}% HP)`, 'event');
+  },
+
+  get foodMultiplier() {
+    let m = 1;
+    for (const e of this.activeEvents) { if (e.foodMult) m *= e.foodMult; }
+    return m;
+  },
+
+  get mutationMultiplier() {
+    let m = 1;
+    for (const e of this.activeEvents) { if (e.mutMult) m *= e.mutMult; }
+    return m;
+  }
+};
+
+// ============================================================
+// SIMULATION
+// ============================================================
+class Simulation {
+  constructor(world) {
+    this.world = world;
+    this.round = 0;
+    this.paused = true;
+    this.speed = 0; // index into speedLevels
+    this.totalBirths = 0;
+    this.totalDeaths = 0;
+    this.eventLog = [];
+    this.popHistory = [];
+    this.selectedLurch = null;
+    this.godMode = false;
+    this.godTool = null;
+    this.tickTimer = null;
+
+    // Timeline system — tracks major moments
+    this.timeline = [];
+    this._lastDominantTrait = null;
+    this._lastPopMilestone = 0;
+    this._peakPop = 0;
+  }
+
+  log(msg, type = '') {
+    this.eventLog.unshift({ round: this.round, msg, type });
+    if (this.eventLog.length > 200) this.eventLog.pop();
+  }
+
+  addTimeline(icon, msg, category = 'event') {
+    this.timeline.push({ round: this.round, icon, msg, category });
+  }
+
+  checkMilestones(alive) {
+    const pop = alive.length;
+    if (pop === 0) {
+      if (this._peakPop > 0) this.addTimeline('💀', `EXTINCTION — all lurches dead (peak was ${this._peakPop})`, 'milestone');
+      return;
+    }
+
+    // Track peak population
+    if (pop > this._peakPop) this._peakPop = pop;
+
+    // Population milestones (every 500)
+    const milestone = Math.floor(pop / 500) * 500;
+    if (milestone > 0 && milestone > this._lastPopMilestone) {
+      this.addTimeline('📈', `Population reached ${milestone}`, 'milestone');
+      this._lastPopMilestone = milestone;
+    }
+    // Population crash detection
+    if (this._lastPopMilestone > milestone + 500 && milestone >= 0) {
+      this.addTimeline('📉', `Population crashed to ${pop}`, 'milestone');
+      this._lastPopMilestone = milestone;
+    }
+
+    // Dominant trait shift
+    const counts = {};
+    for (const g of GENES) counts[g] = 0;
+    for (const l of alive) counts[l.dominantGene]++;
+    let topTrait = GENES[0];
+    for (const g of GENES) { if (counts[g] > counts[topTrait]) topTrait = g; }
+    if (this._lastDominantTrait && topTrait !== this._lastDominantTrait) {
+      const pct = (counts[topTrait] / alive.length * 100).toFixed(0);
+      this.addTimeline('🧬', `${GENE_SHORT[topTrait]} overtook ${GENE_SHORT[this._lastDominantTrait]} as dominant trait (${pct}%)`, 'trait');
+    }
+    this._lastDominantTrait = topTrait;
+  }
+
+  seedPopulation(preset, count) {
+    const rng = this.world.rng;
+    const presetData = LURCH_PRESETS[preset];
+
+    if (preset === 'specialists') {
+      // Two subpopulations
+      const half = Math.floor(count / 2);
+      const meansA = { vitality:0.7, speed:0.3, strength:0.8, intelligence:0.3, fertility:0.5, adaptability:0.3, perception:0.4, size:0.7 };
+      const meansB = { vitality:0.4, speed:0.7, strength:0.2, intelligence:0.8, fertility:0.5, adaptability:0.7, perception:0.7, size:0.3 };
+      for (let i = 0; i < half; i++) this.spawnLurch(Genetics.createGenome(meansA, 0.12, rng));
+      for (let i = 0; i < count - half; i++) this.spawnLurch(Genetics.createGenome(meansB, 0.12, rng));
+    } else {
+      for (let i = 0; i < count; i++) {
+        this.spawnLurch(Genetics.createGenome(presetData.means, presetData.variance, rng));
+      }
+    }
+  }
+
+  spawnLurch(genome, parentA = null, parentB = null) {
+    const rng = this.world.rng;
+    // Find empty non-impassable cell
+    let x, y, attempts = 0;
+    do {
+      x = rng.nextInt(this.world.w);
+      y = rng.nextInt(this.world.h);
+      attempts++;
+    } while ((this.world.getLurch(x, y) || this.world.getTerrain(x, y).impassable) && attempts < 500);
+
+    if (attempts >= 500) return null;
+
+    const id = nextLurchId++;
+    const lurch = new Lurch(id, x, y, genome, parentA, parentB);
+    lurch.birthRound = this.round;
+    if (parentA || parentB) {
+      lurch.juvenile = true;
+      lurch.juvenileTimer = CONFIG.juvenileDuration;
+    } else {
+      lurch.juvenile = false;
+      lurch.juvenileTimer = 0;
+      lurch.age = rng.nextInt(10); // small starting age variation
+    }
+
+    this.world.lurches.push(lurch);
+    this.world.placeLurch(lurch);
+    return lurch;
+  }
+
+  tick() {
+    this.round++;
+    const world = this.world;
+    const rng = world.rng;
+
+    // --- Environment Update ---
+    Events.tick(world, this);
+    world.regenFood(Events.foodMultiplier);
+
+    // --- Decision Phase ---
+    const decisions = [];
+    const alive = world.lurches.filter(l => l.alive);
+    for (const lurch of alive) {
+      lurch.warned = false; // Reset warnings
+    }
+
+    // First pass: kin warnings from brilliant lurches
+    for (const lurch of alive) {
+      if (lurch.genome.intelligence >= 0.6) {
+        // Check for nearby threats
+        for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+          const other = world.getLurch(nx, ny);
+          if (other && other.alive && other.genome.strength > lurch.genome.strength * 0.8) {
+            // Emit warning to kin in range
+            for (const cell of world.cellsInRadius(lurch.x, lurch.y, lurch.perceptionRange)) {
+              const kin = world.getLurch(cell[0], cell[1]);
+              if (kin && kin !== lurch && kin.alive && lurch.genomeSimilarity(kin) > CONFIG.kinSimilarityThreshold) {
+                kin.warned = true;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    for (const lurch of alive) {
+      const decision = DecisionEngine.decide(lurch, world);
+      // Kin warning bias: if warned, bias toward flee/hide
+      if (lurch.warned && decision.action !== 'move' && decision.action !== 'hide') {
+        if (rng.next() < 0.4) {
+          decisions.push({ lurch, decision: { action: 'hide' } });
+          continue;
+        }
+      }
+      decisions.push({ lurch, decision });
+    }
+
+    // --- Resolution Phase ---
+
+    // Fights first
+    for (const { lurch, decision } of decisions) {
+      if (decision.action !== 'fight' || !lurch.alive) continue;
+      const target = decision.target;
+      if (!target || !target.alive) continue;
+
+      lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
+      const damage = lurch.genome.strength * 30 * (0.5 + rng.next() * 0.5);
+      const defense = target.genome.size * 10 + world.getTerrain(target.x, target.y).safety * 2;
+      const net = Math.max(1, damage - defense);
+      target.hp -= net;
+      lurch.lastAction = `fight #${target.id}`;
+      lurch.stress = Math.min(100, lurch.stress + 10);
+      target.stress = Math.min(100, target.stress + 20);
+      this.log(`#${lurch.id} attacked #${target.id} (${Math.round(net)} dmg)`, 'combat');
+      if (target.hp <= 0) {
+        target.alive = false;
+        target.causeOfDeath = 'combat';
+        world.removeLurch(target);
+        this.totalDeaths++;
+        this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
+      }
+    }
+
+    // Movement
+    for (const { lurch, decision } of decisions) {
+      if (decision.action !== 'move' || !lurch.alive) continue;
+      const [dx, dy] = decision.dir || [0, 0];
+      if (dx === 0 && dy === 0) { lurch.lastAction = 'idle'; continue; }
+
+      const steps = lurch.moveSpeed;
+      let moved = false;
+      for (let s = 0; s < steps; s++) {
+        const nx = world.wrapX(lurch.x + dx);
+        const ny = world.wrapY(lurch.y + dy);
+        const t = world.getTerrain(nx, ny);
+        if (t.impassable) break;
+        if (world.getLurch(nx, ny)) break; // Occupied
+
+        const energyCost = t.moveCost * (1 + lurch.genome.size * 0.5) / (1 + lurch.genome.speed * 0.3);
+        lurch.energy = Math.max(0, lurch.energy - energyCost);
+        world.moveLurch(lurch, nx, ny);
+        moved = true;
+      }
+      lurch.lastAction = moved ? 'move' : 'blocked';
+      lurch.hidden = false;
+      lurch.sleeping = false;
+    }
+
+    // Eating
+    for (const { lurch, decision } of decisions) {
+      if (decision.action !== 'eat' || !lurch.alive) continue;
+      const food = world.getFood(lurch.x, lurch.y);
+      const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
+      world.setFood(lurch.x, lurch.y, food - eatAmount);
+      const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3);
+      lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
+      lurch.energy = Math.min(100, lurch.energy + eatAmount * 2);
+      lurch.lastAction = 'eat';
+      lurch.hidden = false;
+      lurch.sleeping = false;
+    }
+
+    // Reproduction
+    const effMutRate = CONFIG.mutationRate * Events.mutationMultiplier;
+    for (const { lurch, decision } of decisions) {
+      if (decision.action !== 'reproduce' || !lurch.alive) continue;
+      const mate = decision.mate;
+      if (!mate || !mate.alive || lurch.juvenile || mate.juvenile) continue;
+      if (lurch.reproCooldown > 0 || mate.reproCooldown > 0) { lurch.lastAction = 'repro-cooldown'; continue; }
+      if (lurch.energy < CONFIG.reproduceEnergyCost || lurch.hunger > 70) continue;
+      if (mate.energy < CONFIG.reproduceEnergyCost * 0.5 || mate.hunger > 70) continue;
+
+      // Check adjacency
+      if (world.chebyshev(lurch.x, lurch.y, mate.x, mate.y) > 1) continue;
+
+      // Success chance: diminishing returns on fertility (pow 1.4 curve)
+      const rawFert = (lurch.genome.fertility + mate.genome.fertility) / 2;
+      let fertChance = Math.pow(rawFert, 1.4); // 0.5→0.38, 0.7→0.61, 0.9→0.86
+
+      // Local density penalty: crowded areas breed less
+      let neighbors = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        if (world.getLurch(nx, ny)) neighbors++;
+      }
+      if (neighbors >= 4) fertChance *= Math.max(0.1, 1 - (neighbors - 3) * 0.15);
+
+      if (rng.next() > fertChance) {
+        lurch.lastAction = 'repro-fail';
+        continue;
+      }
+
+      // Find empty cell near parent
+      const cell = world.emptyAdjacent(lurch.x, lurch.y) || world.emptyAdjacent(mate.x, mate.y);
+      if (!cell) { lurch.lastAction = 'repro-no-room'; continue; }
+
+      // Create offspring
+      const childGenome = Genetics.reproduce(lurch, mate, rng);
+      // Apply mutation multiplier
+      const finalGenome = Events.mutationMultiplier > 1
+        ? Genetics.mutate(childGenome, effMutRate, rng)
+        : childGenome;
+
+      const child = new Lurch(nextLurchId++, cell[0], cell[1], finalGenome, lurch.id, mate.id);
+      child.birthRound = this.round;
+      child.juvenile = true;
+      child.juvenileTimer = CONFIG.juvenileDuration;
+      child.hp = child.maxHP * 0.6;
+      child.hunger = 30;
+      child.energy = 50;
+
+      world.lurches.push(child);
+      world.placeLurch(child);
+      lurch.children.push(child.id);
+      mate.children.push(child.id);
+
+      lurch.energy -= CONFIG.reproduceEnergyCost;
+      mate.energy -= CONFIG.reproduceEnergyCost * 0.5;
+      // Set reproduction cooldown: 2-5 rounds (high fert = shorter cooldown)
+      const cooldown = Math.round(5 - rawFert * 3);
+      lurch.reproCooldown = cooldown;
+      mate.reproCooldown = Math.round(cooldown * 0.6);
+      lurch.lastAction = `reproduce → #${child.id}`;
+      this.totalBirths++;
+      this.log(`#${lurch.id} × #${mate.id} → offspring #${child.id}`, 'birth');
+    }
+
+    // Sleep, Hide, Nothing
+    for (const { lurch, decision } of decisions) {
+      if (!lurch.alive) continue;
+      if (decision.action === 'sleep') {
+        lurch.sleeping = true;
+        lurch.hidden = false;
+        lurch.energy = Math.min(100, lurch.energy + CONFIG.sleepEnergyGain);
+        lurch.hp = Math.min(lurch.maxHP, lurch.hp + lurch.maxHP * 0.05);
+        lurch.stress = Math.max(0, lurch.stress - 10);
+        lurch.lastAction = 'sleep';
+      } else if (decision.action === 'hide') {
+        lurch.hidden = true;
+        lurch.sleeping = false;
+        lurch.energy = Math.max(0, lurch.energy - CONFIG.hideEnergyCost);
+        lurch.lastAction = 'hide';
+      } else if (decision.action === 'nothing') {
+        lurch.hidden = false;
+        lurch.sleeping = false;
+        lurch.lastAction = 'idle';
+      }
+    }
+
+    // --- Status Update ---
+    for (const lurch of world.lurches) {
+      if (!lurch.alive) continue;
+
+      // Age
+      lurch.age++;
+      if (lurch.reproCooldown > 0) lurch.reproCooldown--;
+      if (lurch.juvenile) {
+        lurch.juvenileTimer--;
+        if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
+      }
+
+      // Hunger
+      const metabolism = 1 + lurch.genome.vitality * 0.5 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.fertility * 0.5;
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5);
+
+      // Energy passive drain
+      if (!lurch.sleeping) {
+        lurch.energy = Math.max(0, lurch.energy + CONFIG.energyPerRound);
+      }
+
+      // Stress
+      let stressDelta = -2; // Natural decay
+      if (lurch.hunger > 70) stressDelta += 5;
+      if (lurch.hp / lurch.maxHP < 0.3) stressDelta += 8;
+      // Crowding
+      let adjacent = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        if (world.getLurch(nx, ny)) adjacent++;
+      }
+      if (adjacent > 3) stressDelta += adjacent * 2;
+      // Safe terrain relief
+      if (world.getTerrain(lurch.x, lurch.y).safety >= 4) stressDelta -= 3;
+      lurch.stress = Math.max(0, Math.min(100, lurch.stress + stressDelta));
+
+      // Disease
+      if (lurch.diseased) {
+        lurch.hp -= CONFIG.diseaseDamage * (1 - lurch.genome.adaptability * 0.5);
+        lurch.diseaseTurns--;
+        if (lurch.diseaseTurns <= 0) lurch.diseased = false;
+      }
+
+      // Terrain hazards
+      const terrain = world.getTerrain(lurch.x, lurch.y);
+      if (terrain.drowning && lurch.genome.adaptability < 0.5 && !lurch.hidden) {
+        if (rng.next() < CONFIG.drownChance * (1 - lurch.genome.adaptability)) {
+          lurch.hp -= 20;
+          if (lurch.hp <= 0) lurch.causeOfDeath = 'drowning';
+        }
+      }
+      if (terrain === TERRAIN.DESERT) {
+        lurch.energy = Math.max(0, lurch.energy - CONFIG.desertEnergyDrain);
+      }
+      if (terrain.disease && !lurch.diseased && rng.next() < CONFIG.diseaseChance * (1 - lurch.genome.adaptability * 0.7)) {
+        lurch.diseased = true;
+        lurch.diseaseTurns = 10 + rng.nextInt(10);
+      }
+
+      // Death checks
+      if (lurch.hunger >= CONFIG.starvationThreshold) {
+        lurch.hp = 0;
+        lurch.causeOfDeath = 'starvation';
+      }
+      if (lurch.age >= lurch.maxAge) {
+        lurch.hp = 0;
+        lurch.causeOfDeath = 'old age';
+      }
+      if (lurch.hp <= 0 && lurch.alive) {
+        lurch.alive = false;
+        if (!lurch.causeOfDeath) lurch.causeOfDeath = 'disease';
+        world.removeLurch(lurch);
+        // Drop food as corpse
+        world.setFood(lurch.x, lurch.y, world.getFood(lurch.x, lurch.y) + 2 + lurch.genome.size * 3);
+        this.totalDeaths++;
+        this.log(`#${lurch.id} died (${lurch.causeOfDeath}, age ${lurch.age})`, 'death');
+      }
+
+      // Update dominant gene (could shift as mutations accumulate... well it's fixed per lurch but let's keep it accurate)
+      if (lurch.alive) lurch.dominantGene = lurch.getDominantGene();
+    }
+
+    // Record population & check milestones
+    const aliveNow = world.lurches.filter(l => l.alive);
+    const pop = aliveNow.length;
+    this.popHistory.push(pop);
+    if (this.popHistory.length > 500) this.popHistory.shift();
+    // Check timeline milestones every 10 rounds to reduce overhead
+    if (this.round % 10 === 0) this.checkMilestones(aliveNow);
+  }
+
+  start() {
+    this.paused = false;
+    this.scheduleTickLoop();
+  }
+
+  pause() {
+    this.paused = true;
+    if (this.tickTimer) { clearTimeout(this.tickTimer); this.tickTimer = null; }
+  }
+
+  togglePause() {
+    if (this.paused) this.start(); else this.pause();
+  }
+
+  scheduleTickLoop() {
+    if (this.paused) return;
+    this.tickTimer = setTimeout(() => {
+      this.tick();
+      renderer.render();
+      ui.update();
+      this.scheduleTickLoop();
+    }, CONFIG.speedLevels[this.speed]);
+  }
+
+  stepOnce() {
+    this.tick();
+    renderer.render();
+    ui.update();
+  }
+
+  setSpeed(idx) {
+    this.speed = Math.max(0, Math.min(CONFIG.speedLevels.length - 1, idx));
+    if (!this.paused) {
+      if (this.tickTimer) clearTimeout(this.tickTimer);
+      this.scheduleTickLoop();
+    }
+  }
+}
+
+// ============================================================
+// RENDERER
+// ============================================================
+class Renderer {
+  constructor(canvas, world) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.world = world;
+    this.cellW = 12;
+    this.cellH = 18;
+    this.scrollX = 0;
+    this.scrollY = 0;
+    this.font = '14px Menlo, Courier New, Consolas, monospace';
+    this.resized = false;
+  }
+
+  resize() {
+    const container = document.getElementById('grid-container');
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+
+    // Compute cell size to fit as much grid as possible
+    this.cellW = Math.max(8, Math.floor(cw / Math.min(this.world.w, 120)));
+    this.cellH = Math.max(12, Math.floor(ch / Math.min(this.world.h, 60)));
+
+    // Keep aspect ratio reasonable
+    this.cellH = Math.max(this.cellH, Math.floor(this.cellW * 1.4));
+    this.cellW = Math.max(this.cellW, Math.floor(this.cellH * 0.6));
+
+    this.canvas.width = cw;
+    this.canvas.height = ch;
+    this.visibleCols = Math.ceil(cw / this.cellW) + 1;
+    this.visibleRows = Math.ceil(ch / this.cellH) + 1;
+    this.font = `${Math.floor(this.cellH * 0.78)}px Menlo, Courier New, Consolas, monospace`;
+    this.resized = true;
+  }
+
+  render() {
+    if (!this.resized) this.resize();
+    const ctx = this.ctx;
+    const w = this.world;
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.font = this.font;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    const halfCellW = this.cellW / 2;
+    const halfCellH = this.cellH / 2;
+
+    for (let row = 0; row < this.visibleRows; row++) {
+      for (let col = 0; col < this.visibleCols; col++) {
+        const gx = w.wrapX(col + this.scrollX);
+        const gy = w.wrapY(row + this.scrollY);
+        const px = col * this.cellW;
+        const py = row * this.cellH;
+        const terrain = w.getTerrain(gx, gy);
+        const lurch = w.getLurch(gx, gy);
+
+        // Background
+        ctx.fillStyle = terrain.bgColor;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+
+        // Food indicator (subtle brightness)
+        const food = w.getFood(gx, gy);
+        if (food > 2) {
+          ctx.fillStyle = `rgba(80, 120, 60, ${food / CONFIG.foodCap * 0.15})`;
+          ctx.fillRect(px, py, this.cellW, this.cellH);
+        }
+
+        // Global event overlays (ice age, drought)
+        const hasIceAge = Events.activeEvents.some(e => e.vfxType === 'iceage');
+        const hasDrought = Events.activeEvents.some(e => e.vfxType === 'drought');
+        if (hasIceAge) {
+          const flicker = 0.12 + Math.sin(performance.now() / 1500 + gx * 0.3 + gy * 0.5) * 0.05;
+          ctx.fillStyle = `rgba(173, 226, 255, ${flicker})`;
+          ctx.fillRect(px, py, this.cellW, this.cellH);
+          // Frost character ▓ on ~30% of cells, shifting over time
+          const frostHash = Math.sin(gx * 127.1 + gy * 311.7 + Math.floor(performance.now() / 4000)) * 43758.5453;
+          if ((frostHash - Math.floor(frostHash)) < 0.3) {
+            ctx.globalAlpha = 0.25 + Math.sin(performance.now() / 2500 + gx + gy) * 0.1;
+            ctx.fillStyle = '#ade2ff';
+            ctx.fillText('\u2593', px + halfCellW, py + halfCellH);
+            ctx.globalAlpha = 1;
+          }
+        }
+        if (hasDrought) {
+          const flicker = 0.06 + Math.sin(performance.now() / 3000 + gx * 0.2 + gy * 0.4) * 0.02;
+          ctx.fillStyle = `rgba(200, 150, 50, ${flicker})`;
+          ctx.fillRect(px, py, this.cellW, this.cellH);
+        }
+
+        if (lurch && lurch.alive) {
+          // Draw lurch
+          const state = lurch.healthState;
+          let color = lurch.color;
+          let alpha = 1;
+
+          if (state === 'dim') alpha = 0.5;
+          else if (state === 'critical') alpha = (sim.round % 2 === 0) ? 1 : 0.2;
+          else if (state === 'sleeping') {
+            // Inverse: draw bg-colored @ on light bg
+            ctx.fillStyle = 'rgba(60, 60, 80, 0.6)';
+            ctx.fillRect(px, py, this.cellW, this.cellH);
+            color = '#222233';
+            alpha = 1;
+          }
+
+          // Disease indicator — blink sickly yellow-green
+          if (lurch.diseased) {
+            const blinkPhase = Math.sin(performance.now() / 180 + lurch.id * 0.7);
+            ctx.fillStyle = blinkPhase > 0 ? 'rgba(140, 110, 0, 0.4)' : 'rgba(80, 120, 0, 0.25)';
+            ctx.fillRect(px, py, this.cellW, this.cellH);
+            alpha *= (0.5 + blinkPhase * 0.25 + 0.25); // pulse between 0.5 and 1.0
+          }
+
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.fillText('@', px + halfCellW, py + halfCellH);
+          ctx.globalAlpha = 1;
+
+          // Juvenile indicator: smaller
+          if (lurch.juvenile) {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillText('·', px + halfCellW, py + halfCellH - this.cellH * 0.25);
+          }
+
+          // Selected highlight
+          if (sim.selectedLurch === lurch) {
+            ctx.strokeStyle = '#ffff44';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px + 1, py + 1, this.cellW - 2, this.cellH - 2);
+          }
+        } else {
+          // Draw terrain char
+          ctx.fillStyle = terrain.color;
+          ctx.globalAlpha = 0.6;
+          ctx.fillText(terrain.char, px + halfCellW, py + halfCellH);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // Per-cell VFX overlay pass
+    const now = performance.now();
+    for (const vfx of Events.vfx) {
+      const col = vfx.x - this.scrollX;
+      const row = vfx.y - this.scrollY;
+      // Handle toroidal wrapping for visible area
+      const wCol = ((col % w.w) + w.w) % w.w;
+      const wRow = ((row % w.h) + w.h) % w.h;
+      if (wCol >= this.visibleCols || wRow >= this.visibleRows) continue;
+      const px = wCol * this.cellW;
+      const py = wRow * this.cellH;
+      const life = vfx.ttl / vfx.maxTtl; // 1.0 → 0.0
+
+      if (vfx.type === 'fire') {
+        const flicker = Math.sin(now / 80 + vfx.x * 1.7 + vfx.y * 2.3) * 0.5 + 0.5;
+        // Background glow — red/orange
+        ctx.fillStyle = `rgba(180, 30, 0, ${life * 0.6 * (0.4 + flicker * 0.6)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+        // Shade character: ▓ (178) on perimeter, ▒ (177) inner — both red
+        const ch = vfx.zone === 'perimeter' ? '\u2593' : '\u2592';
+        const brightness = Math.floor(180 + flicker * 75);
+        ctx.globalAlpha = life * 0.9;
+        ctx.fillStyle = `rgb(${brightness}, ${Math.floor(30 + flicker * 40)}, 0)`;
+        ctx.fillText(ch, px + halfCellW, py + halfCellH);
+        ctx.globalAlpha = 1;
+      } else if (vfx.type === 'ash') {
+        // Burned wake: ░ (176) in dark gray, long-lasting
+        ctx.fillStyle = `rgba(20, 15, 10, ${Math.min(life * 1.5, 0.7)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+        ctx.globalAlpha = Math.min(life * 1.2, 0.6);
+        ctx.fillStyle = '#444038';
+        ctx.fillText('\u2591', px + halfCellW, py + halfCellH);
+        ctx.globalAlpha = 1;
+      } else if (vfx.type === 'flood') {
+        const shimmer = Math.sin(now / 300 + vfx.x + vfx.y * 1.5) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(50, 120, 255, ${life * 0.35 * (0.6 + shimmer * 0.4)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+      } else if (vfx.type === 'quake') {
+        const pulse = Math.sin(now / 80 + vfx.x * 0.5) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(200, 80, 30, ${life * 0.4 * pulse})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+      } else if (vfx.type === 'explosion') {
+        const pulse = Math.sin(now / 60) * 0.5 + 0.5;
+        const r = life > 0.7 ? 255 : Math.floor(255 * life);
+        const g = life > 0.7 ? Math.floor(255 * (1 - (life - 0.7) * 3)) : Math.floor(100 * life);
+        ctx.fillStyle = `rgba(${r}, ${g}, 0, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+      }
+    }
+  }
+
+  // Convert pixel coords to grid coords
+  pixelToGrid(px, py) {
+    const col = Math.floor(px / this.cellW);
+    const row = Math.floor(py / this.cellH);
+    return [this.world.wrapX(col + this.scrollX), this.world.wrapY(row + this.scrollY)];
+  }
+}
+
+// ============================================================
+// UI CONTROLLER
+// ============================================================
+const ui = {
+  init() {
+    this.roundEl = document.getElementById('round-num');
+    this.popEl = document.getElementById('pop-num');
+    this.birthEl = document.getElementById('birth-num');
+    this.deathEl = document.getElementById('death-num');
+    this.avgAgeEl = document.getElementById('avg-age');
+    this.foodPctEl = document.getElementById('food-pct');
+    this.speedEl = document.getElementById('speed-display');
+    this.pauseBtn = document.getElementById('pause-btn');
+    this.logEl = document.getElementById('event-log');
+    this.inspectorEl = document.getElementById('inspector-content');
+    this.sparkCanvas = document.getElementById('sparkline-canvas');
+    this.sparkCtx = this.sparkCanvas.getContext('2d');
+    this.traitDistEl = document.getElementById('trait-distribution');
+    this.activeEventsEl = document.getElementById('active-events');
+    this.godPanel = document.getElementById('godmode-panel');
+
+    // Find-top-lurch click handler (delegated)
+    this.traitDistEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.gene-find');
+      if (!btn) return;
+      const gene = btn.dataset.gene;
+      const alive = world.lurches.filter(l => l.alive);
+      if (alive.length === 0) return;
+      let best = alive[0];
+      for (const l of alive) {
+        if (l.genome[gene] > best.genome[gene]) best = l;
+      }
+      sim.selectedLurch = best;
+      // Scroll renderer to center on this lurch
+      renderer.scrollX = best.x - Math.floor(renderer.visibleCols / 2);
+      renderer.scrollY = best.y - Math.floor(renderer.visibleRows / 2);
+      renderer.render();
+      ui.updateInspector(best);
+    });
+  },
+
+  update() {
+    const alive = world.lurches.filter(l => l.alive);
+    const pop = alive.length;
+
+    this.roundEl.textContent = sim.round;
+    this.popEl.textContent = pop;
+    this.birthEl.textContent = sim.totalBirths;
+    this.deathEl.textContent = sim.totalDeaths;
+    this.speedEl.textContent = CONFIG.speedLabels[sim.speed];
+    this.pauseBtn.textContent = sim.paused ? '▶ Play' : '⏸ Pause';
+
+    if (pop > 0) {
+      const avgAge = Math.round(alive.reduce((s, l) => s + l.age, 0) / pop);
+      this.avgAgeEl.textContent = avgAge;
+    } else {
+      this.avgAgeEl.textContent = '—';
+    }
+
+    // Food %
+    let totalFood = 0, totalCap = world.w * world.h * CONFIG.foodCap;
+    for (let i = 0; i < world.w * world.h; i++) totalFood += world.food[i];
+    this.foodPctEl.textContent = Math.round(totalFood / totalCap * 100) + '%';
+
+    // Event log
+    const logHTML = sim.eventLog.slice(0, 30).map(e =>
+      `<div class="log-entry ${e.type}">[R${e.round}] ${e.msg}</div>`
+    ).join('');
+    this.logEl.innerHTML = logHTML;
+
+    // Sparkline
+    this.drawSparkline();
+
+    // Trait distribution
+    this.drawTraitDistribution(alive);
+
+    // Active events
+    if (Events.activeEvents.length > 0) {
+      this.activeEventsEl.innerHTML = Events.activeEvents.map(e =>
+        `<div style="color:#cccc44;font-size:12px;">${e.name} (${e.duration} rounds)</div>`
+      ).join('');
+    } else {
+      this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
+    }
+
+    // Inspector
+    if (sim.selectedLurch) {
+      this.updateInspector(sim.selectedLurch);
+    }
+
+    // Timeline (update every 20 rounds to reduce DOM thrash)
+    if (sim.round % 20 === 0 || sim.timeline.length !== this._lastTimelineLen) {
+      this._lastTimelineLen = sim.timeline.length;
+      const tlEl = document.getElementById('timeline-content');
+      if (tlEl && sim.timeline.length > 0) {
+        tlEl.innerHTML = sim.timeline.slice().reverse().slice(0, 50).map(t =>
+          `<div class="tl-entry ${t.category}"><span class="tl-round">R${t.round}</span><span class="tl-icon">${t.icon}</span><span class="tl-msg">${t.msg}</span></div>`
+        ).join('');
+      }
+    }
+  },
+
+  drawSparkline() {
+    const c = this.sparkCanvas;
+    const ctx = this.sparkCtx;
+    c.width = c.clientWidth;
+    c.height = 40;
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    const data = sim.popHistory;
+    if (data.length < 2) return;
+
+    const max = Math.max(...data, 1);
+    const step = c.width / (data.length - 1);
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#446644';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < data.length; i++) {
+      const x = i * step;
+      const y = c.height - (data[i] / max) * (c.height - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill
+    ctx.lineTo((data.length - 1) * step, c.height);
+    ctx.lineTo(0, c.height);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(68, 102, 68, 0.2)';
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = '#556655';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(data[data.length - 1], 4, 12);
+  },
+
+  drawTraitDistribution(alive) {
+    if (alive.length === 0) {
+      this.traitDistEl.innerHTML = '<span style="color:#555577">No population</span>';
+      return;
+    }
+    const counts = {};
+    for (const g of GENES) counts[g] = 0;
+    for (const l of alive) counts[l.dominantGene]++;
+
+    let html = '';
+    for (const g of GENES) {
+      const pct = (counts[g] / alive.length * 100).toFixed(0);
+      const w = counts[g] / alive.length * 100;
+      html += `<div class="gene-bar">
+        <span class="gene-label">${GENE_SHORT[g]}</span>
+        <div class="gene-track"><div class="gene-fill" style="width:${w}%;background:${GENE_COLORS[g]}"></div></div>
+        <span class="gene-val">${counts[g]}<br>(${pct}%)</span>
+        <span class="gene-find" data-gene="${g}" title="Find top ${g} lurch">&#x25B6;</span>
+      </div>`;
+    }
+    this.traitDistEl.innerHTML = html;
+  },
+
+  updateInspector(lurch) {
+    if (!lurch || !lurch.alive) {
+      this.inspectorEl.innerHTML = '<span style="color:#555577">Lurch is dead or deselected</span>';
+      sim.selectedLurch = null;
+      return;
+    }
+
+    let html = `<div style="color:#ccccee;font-size:13px;margin-bottom:6px;">
+      <strong style="color:${lurch.color}">@ LURCH #${lurch.id}</strong>
+      ${lurch.juvenile ? '<span style="color:#888866;font-size:11px;"> (juvenile)</span>' : ''}
+      ${lurch.diseased ? '<span style="color:#aa8800;font-size:11px;"> [DISEASED]</span>' : ''}
+    </div>`;
+
+    html += `<div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${lurch.age} / ${Math.round(lurch.maxAge)}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">HP</span><span class="stat-value">${Math.round(lurch.hp)} / ${Math.round(lurch.maxHP)}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Hunger</span><span class="stat-value">${Math.round(lurch.hunger)} / ${CONFIG.starvationThreshold}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Energy</span><span class="stat-value">${Math.round(lurch.energy)}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Stress</span><span class="stat-value">${Math.round(lurch.stress)}</span></div>`;
+
+    html += '<div style="margin:6px 0 4px;border-top:1px solid #1e1e2e;padding-top:4px;">';
+    for (const g of GENES) {
+      const v = lurch.genome[g];
+      const w = v * 100;
+      html += `<div class="gene-bar">
+        <span class="gene-label">${GENE_SHORT[g]}</span>
+        <div class="gene-track"><div class="gene-fill" style="width:${w}%;background:${GENE_COLORS[g]}"></div></div>
+        <span class="gene-val">${v.toFixed(2)}</span>
+      </div>`;
+    }
+    html += '</div>';
+
+    html += `<div class="stat-row"><span class="stat-label">Parents</span><span class="stat-value">${lurch.parentA ? `#${lurch.parentA} × #${lurch.parentB}` : 'Original'}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Children</span><span class="stat-value">${lurch.children.length > 0 ? lurch.children.slice(-5).map(c => '#'+c).join(', ') : 'None'}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Action</span><span class="stat-value">${lurch.lastAction}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Terrain</span><span class="stat-value">${world.getTerrain(lurch.x, lurch.y).name}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Position</span><span class="stat-value">(${lurch.x}, ${lurch.y})</span></div>`;
+
+    this.inspectorEl.innerHTML = html;
+  },
+
+  showGodMode() {
+    sim.godMode = true;
+    this.godPanel.style.display = 'block';
+  },
+
+  hideGodMode() {
+    sim.godMode = false;
+    sim.godTool = null;
+    this.godPanel.style.display = 'none';
+  },
+
+  toggleGodMode() {
+    if (sim.godMode) this.hideGodMode(); else this.showGodMode();
+  }
+};
+
+// ============================================================
+// GLOBALS
+// ============================================================
+let world, sim, renderer;
+
+// ============================================================
+// INPUT HANDLING
+// ============================================================
+function initInput() {
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('setup-screen').style.display !== 'none') return;
+
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        sim.togglePause();
+        ui.update();
+        break;
+      case '+': case '=':
+        sim.setSpeed(sim.speed + 1);
+        ui.update();
+        break;
+      case '-': case '_':
+        sim.setSpeed(sim.speed - 1);
+        ui.update();
+        break;
+      case 'g': case 'G':
+        ui.toggleGodMode();
+        break;
+      case 'Escape':
+        ui.hideGodMode();
+        document.getElementById('help-overlay').classList.remove('visible');
+        break;
+      case '?':
+        document.getElementById('help-overlay').classList.toggle('visible');
+        break;
+      case 'n': case 'N':
+        if (sim.paused) { sim.stepOnce(); }
+        break;
+      case 'f': case 'F':
+        if (!sim.godMode) {
+          // Follow: center on selected lurch
+          if (sim.selectedLurch && sim.selectedLurch.alive) {
+            renderer.scrollX = sim.selectedLurch.x - Math.floor(renderer.visibleCols / 2);
+            renderer.scrollY = sim.selectedLurch.y - Math.floor(renderer.visibleRows / 2);
+            renderer.render();
+          }
+        } else {
+          // Fertility wave in god mode
+          const sevEl = document.getElementById('god-severity');
+          Events._severity = sevEl ? parseInt(sevEl.value) || 5 : 5;
+          Events.fertwave(world, sim);
+          renderer.render();
+          ui.update();
+        }
+        break;
+      case 'ArrowLeft':  renderer.scrollX = world.wrapX(renderer.scrollX - 3); renderer.render(); break;
+      case 'ArrowRight': renderer.scrollX = world.wrapX(renderer.scrollX + 3); renderer.render(); break;
+      case 'ArrowUp':    renderer.scrollY = world.wrapY(renderer.scrollY - 3); renderer.render(); break;
+      case 'ArrowDown':  renderer.scrollY = world.wrapY(renderer.scrollY + 3); renderer.render(); break;
+    }
+
+    // God mode number keys
+    if (sim.godMode) {
+      const godEvents = {
+        '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
+        '5': 'iceage', '6': 'meteor', '0': 'fertile',
+        '7': 'virus', '8': 'plague', '9': 'mutationburst',
+        'b': 'bottleneck', 'B': 'bottleneck',
+        'r': 'rejuvenation', 'R': 'rejuvenation',
+      };
+      const godTools = {
+        'l': 'smite', 'L': 'smite',
+        'v': 'bless', 'V': 'bless',
+        'p': 'food', 'P': 'food',
+        'w': 'wall', 'W': 'wall',
+      };
+
+      if (godEvents[e.key]) {
+        const sevEl = document.getElementById('god-severity');
+        Events._severity = sevEl ? parseInt(sevEl.value) || 5 : 5;
+        Events[godEvents[e.key]](world, sim);
+        renderer.render();
+        ui.update();
+      }
+      if (godTools[e.key]) {
+        sim.godTool = godTools[e.key];
+        sim.log(`God tool selected: ${sim.godTool}`, 'god');
+      }
+    }
+  });
+
+  // Click on grid
+  const canvas = document.getElementById('grid-canvas');
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
+
+    if (sim.godMode && sim.godTool) {
+      // Apply god tool
+      switch (sim.godTool) {
+        case 'smite': {
+          const l = world.getLurch(gx, gy);
+          if (l && l.alive) {
+            l.hp = 0;
+            l.causeOfDeath = 'divine smite';
+            l.alive = false;
+            world.removeLurch(l);
+            sim.totalDeaths++;
+            sim.log(`⚡ SMITE — Lurch #${l.id} struck down`, 'god');
+          }
+          break;
+        }
+        case 'bless': {
+          const l = world.getLurch(gx, gy);
+          if (l && l.alive) {
+            l.hp = l.maxHP;
+            l.hunger = 0;
+            l.energy = 100;
+            l.stress = 0;
+            l.diseased = false;
+            sim.log(`✨ BLESS — Lurch #${l.id} fully healed`, 'god');
+          }
+          break;
+        }
+        case 'food':
+          world.setFood(gx, gy, CONFIG.foodCap);
+          sim.log(`🍎 Placed food at (${gx},${gy})`, 'god');
+          break;
+        case 'wall':
+          world.setTerrain(gx, gy, TERRAIN.WALL);
+          const l = world.getLurch(gx, gy);
+          if (l && l.alive) {
+            l.hp = 0; l.causeOfDeath = 'crushed'; l.alive = false;
+            world.removeLurch(l);
+            sim.totalDeaths++;
+          }
+          sim.log(`🧱 Built wall at (${gx},${gy})`, 'god');
+          break;
+      }
+      sim.godTool = null;
+      renderer.render();
+      ui.update();
+      return;
+    }
+
+    // Normal click: select lurch
+    const lurch = world.getLurch(gx, gy);
+    sim.selectedLurch = lurch || null;
+    renderer.render();
+    ui.update();
+  });
+
+  // Severity slider display
+  const sevSlider = document.getElementById('god-severity');
+  const sevVal = document.getElementById('god-severity-val');
+  sevSlider.addEventListener('input', () => { sevVal.textContent = sevSlider.value; });
+
+  // Helper: read severity and set it on Events before triggering
+  function triggerGodEvent(eventName) {
+    Events._severity = parseInt(sevSlider.value) || 5;
+    if (Events[eventName]) {
+      Events[eventName](world, sim);
+      // Log to timeline
+      const name = eventName.charAt(0).toUpperCase() + eventName.slice(1);
+      const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', virus:'🦠', plague:'💀', mutationburst:'🧪', fertwave:'🌸', bottleneck:'⚡', rejuvenation:'✨' };
+      sim.addTimeline(icons[eventName] || '⚡', `${name} [${Events._severity}]`, 'godmode');
+      renderer.render();
+      ui.update();
+    }
+  }
+
+  // God mode buttons — auto-close panel after triggering event
+  document.querySelectorAll('.gm-btn[data-event]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      triggerGodEvent(btn.dataset.event);
+      ui.hideGodMode();
+    });
+  });
+  document.querySelectorAll('.gm-btn[data-tool]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sim.godTool = btn.dataset.tool;
+      sim.log(`God tool selected: ${sim.godTool} — click on grid`, 'god');
+      ui.hideGodMode();
+    });
+  });
+
+  // Topbar buttons
+  document.getElementById('pause-btn').addEventListener('click', () => { sim.togglePause(); ui.update(); });
+  document.getElementById('speed-up').addEventListener('click', () => { sim.setSpeed(sim.speed + 1); ui.update(); });
+  document.getElementById('speed-down').addEventListener('click', () => { sim.setSpeed(sim.speed - 1); ui.update(); });
+  document.getElementById('god-btn').addEventListener('click', () => ui.toggleGodMode());
+
+  // Resize
+  window.addEventListener('resize', () => {
+    renderer.resize();
+    renderer.render();
+  });
+}
+
+// ============================================================
+// SETUP & START
+// ============================================================
+document.getElementById('start-btn').addEventListener('click', () => {
+  const gridW = parseInt(document.getElementById('grid-w').value) || 80;
+  const gridH = parseInt(document.getElementById('grid-h').value) || 40;
+  const popCount = parseInt(document.getElementById('pop-count').value) || 40;
+  const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
+  const seedStr = document.getElementById('rng-seed').value.trim();
+  const mapPreset = document.getElementById('map-preset').value;
+  const lurchPreset = document.getElementById('lurch-preset').value;
+
+  CONFIG.gridW = gridW;
+  CONFIG.gridH = gridH;
+  CONFIG.population = popCount;
+  CONFIG.mutationRate = mutRate;
+
+  const seed = seedStr ? parseInt(seedStr) || hashString(seedStr) : Math.floor(Math.random() * 2147483647);
+  const rng = new SeededRNG(seed);
+
+  // Init world
+  world = new World(gridW, gridH, rng);
+  generateMap(world, mapPreset, rng);
+
+  // Init simulation
+  sim = new Simulation(world);
+  sim.seedPopulation(lurchPreset, popCount);
+
+  // Init renderer
+  const canvas = document.getElementById('grid-canvas');
+  renderer = new Renderer(canvas, world);
+  renderer.resize();
+  renderer.render();
+
+  // Init UI
+  ui.init();
+  ui.update();
+
+  // Init input & help
+  initInput();
+  initHelp();
+
+  // Hide setup, show game
+  document.getElementById('setup-screen').style.display = 'none';
+
+  // Auto-start paused
+  sim.log(`World seeded (seed: ${seed}). Population: ${popCount} Lurches.`, 'event');
+  sim.log('Press SPACE to begin simulation.', 'event');
+  ui.update();
+});
+
+// ============================================================
+// HELP SYSTEM
+// ============================================================
+const HELP_CONTENT = {
+  overview: `
+    <h3>What is Lurches?</h3>
+    <p>Lurches is a genetic simulation sandbox. You seed a toroidal world with creatures called <strong style="color:#ccccee">Lurches</strong>, configure terrain and environmental parameters, then watch life unfold — intervening as a god when you choose.</p>
+    <p>The core joy is watching emergent behavior arise from simple rules: natural selection, genetic drift, competition, cooperation, and extinction — then throwing a wrench into it.</p>
+    <h3>How It Works</h3>
+    <p>Each round, every Lurch scans its surroundings and makes a decision — eat, move, fight, sleep, hide, reproduce, or do nothing. Their <strong style="color:#4488ff">intelligence</strong> determines <em>how well</em> they decide. After all decisions are made, actions resolve simultaneously: fights first, then movement, eating, reproduction, and rest.</p>
+    <p>Lurches have 8 heritable genes. When two mate, offspring get a blend of parent genes plus random mutations. Over time, natural selection shapes the population — the well-adapted thrive, the rest perish.</p>
+    <h3>Your Role</h3>
+    <p>You're not trying to win. You're cultivating a world and observing consequences. Use <strong style="color:#dd66dd">God Mode</strong> to trigger droughts, meteors, plagues — or bless a favored Lurch. Watch what survives.</p>
+  `,
+  terrain: `
+    <h3>Terrain Types</h3>
+    <p>The world is a toroidal grid (wraps in all directions — no edges). Each cell has a terrain type that affects food, movement, safety, and special hazards.</p>
+    <table>
+      <tr><th>Char</th><th>Terrain</th><th>Food</th><th>Move</th><th>Safety</th><th>Special</th></tr>
+      <tr><td style="color:#2255aa">~</td><td>Deep Water</td><td>3</td><td>4</td><td>2</td><td style="color:#aa6644">Drowning risk</td></tr>
+      <tr><td style="color:#7a8a5a">.</td><td>Plains</td><td>2</td><td>1</td><td>2</td><td>Exposed — easy to find, be found</td></tr>
+      <tr><td style="color:#3a7a3a">#</td><td>Forest</td><td>4</td><td>2</td><td>4</td><td>Good foraging, hard to spot</td></tr>
+      <tr><td style="color:#8a8a8a">^</td><td>Mountain</td><td>1</td><td>4</td><td>5</td><td>Fortress terrain, scarce food</td></tr>
+      <tr><td style="color:#5a7a3a">"</td><td>Swamp</td><td>3</td><td>3</td><td>1</td><td style="color:#aa6644">Disease risk</td></tr>
+      <tr><td style="color:#ba8a3a">░</td><td>Desert</td><td>0</td><td>2</td><td>3</td><td style="color:#aa6644">Drains energy</td></tr>
+      <tr><td style="color:#4a99aa">≈</td><td>Shallows</td><td>2</td><td>2</td><td>3</td><td>Transition water/land</td></tr>
+      <tr><td style="color:#7a5a8a">♠</td><td>Ruins</td><td>1</td><td>1</td><td>2</td><td>Mysterious</td></tr>
+    </table>
+    <h3>Food</h3>
+    <p>Each cell regenerates food each round based on terrain type, up to a cap of 10. Lurches deplete food when they eat. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
+    <h3>Map Presets</h3>
+    <p><strong>Pangaea</strong> — one big continent. <strong>Eden</strong> — lush forests, abundant food. <strong>The Crucible</strong> — mostly desert with a tiny oasis. <strong>Archipelago</strong> — islands in deep water. <strong>Ring World</strong> — habitable ring around a deadly center. <strong>Waterworld</strong> — mostly ocean with scattered land.</p>
+  `,
+  lurches: `
+    <h3>What Are Lurches?</h3>
+    <p>Lurches are creatures rendered as <strong style="color:#ff4444">@</strong> on the grid. Their color shows their dominant genetic trait — the gene with the highest value.</p>
+    <table>
+      <tr><th>Color</th><th>Dominant Trait</th></tr>
+      <tr><td><span class="chip" style="color:#ff4444">@</span></td><td>Strength — aggression, power</td></tr>
+      <tr><td><span class="chip" style="color:#4488ff">@</span></td><td>Intelligence — calm, calculating</td></tr>
+      <tr><td><span class="chip" style="color:#44ff44">@</span></td><td>Vitality — life force, endurance</td></tr>
+      <tr><td><span class="chip" style="color:#ff44ff">@</span></td><td>Fertility — reproductive drive</td></tr>
+      <tr><td><span class="chip" style="color:#44ffff">@</span></td><td>Speed — quick, electric</td></tr>
+      <tr><td><span class="chip" style="color:#ffff44">@</span></td><td>Adaptability — versatile</td></tr>
+      <tr><td><span class="chip" style="color:#cccccc">@</span></td><td>Perception — alert, aware</td></tr>
+      <tr><td><span class="chip" style="color:#ffffff">@</span></td><td>Size — imposing, dominant</td></tr>
+    </table>
+    <h3>Health States</h3>
+    <p><strong>Bright</strong> = healthy. <strong>Normal</strong> = moderate. <strong>Dim</strong> = hungry/injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping.</p>
+    <h3>Death</h3>
+    <p>Lurches die from: starvation (hunger hits 100), combat (HP hits 0), old age, disease, drowning (deep water without adaptability), desert exposure, or divine smiting.</p>
+  `,
+  genetics: `
+    <h3>The 8 Genes</h3>
+    <p>Every Lurch has 8 genes, each a value from 0.0 to 1.0. Higher is stronger but comes with tradeoffs — bigger Lurches need more food, faster ones burn more energy.</p>
+    <table>
+      <tr><th>Gene</th><th>Effect</th><th>Tradeoff</th></tr>
+      <tr><td style="color:#44ff44">VIT</td><td>Max HP, lifespan, starvation resistance</td><td>Higher metabolism</td></tr>
+      <tr><td style="color:#44ffff">SPD</td><td>Tiles per move, flee success</td><td>Burns more energy</td></tr>
+      <tr><td style="color:#ff4444">STR</td><td>Combat damage, carrying capacity</td><td>Higher food needs</td></tr>
+      <tr><td style="color:#4488ff">INT</td><td>Decision quality, pathfinding, threat assessment</td><td>Slower reproduction</td></tr>
+      <tr><td style="color:#ff44ff">FER</td><td>Reproduction chance, potential litter size</td><td>Offspring start weaker</td></tr>
+      <tr><td style="color:#ffff44">ADP</td><td>Disease/terrain/temperature resistance</td><td>Jack of all trades</td></tr>
+      <tr><td style="color:#cccccc">PER</td><td>Detection range for food, threats, mates</td><td>Stress in crowds</td></tr>
+      <tr><td style="color:#ffffff">SIZ</td><td>HP bonus, combat advantage, intimidation</td><td>Needs more food, easier to spot</td></tr>
+    </table>
+    <h3>Reproduction</h3>
+    <p>Two adjacent Lurches that both choose to reproduce create offspring. Genes are a <em>weighted blend</em> of both parents, plus random mutation. Rare macro-mutations can produce wildly different offspring.</p>
+    <h3>Natural Selection</h3>
+    <p>Over time, populations converge toward traits that fit their environment. Geographically separated groups diverge. Catastrophes create genetic bottlenecks. It's evolution in fast-forward.</p>
+  `,
+  ai: `
+    <h3>Intelligence Tiers</h3>
+    <p>A Lurch's Intelligence gene doesn't just make them "better" — it changes <em>how</em> they think.</p>
+    <h3>Instinctive (INT 0.0–0.2)</h3>
+    <p>Purely reactive. If hungry, eat. If threatened, fight or flee (coin flip). Random movement. Mates with anyone adjacent.</p>
+    <h3>Aware (INT 0.3–0.5)</h3>
+    <p>Assesses immediate surroundings. Moves toward visible food. Flees from stronger opponents. Prefers hiding when weak.</p>
+    <h3>Strategic (INT 0.6–0.8)</h3>
+    <p>Pathfinds to food-rich areas. Evaluates mate quality. Retreats to safe terrain when injured. Stockpiles energy before reproducing.</p>
+    <h3>Brilliant (INT 0.9–1.0)</h3>
+    <p>Plans ahead. Avoids swamp disease and desert traps. Seeks optimal mates with complementary stats. Shows territorial behavior.</p>
+    <h3>Stress</h3>
+    <p>High stress degrades effective Intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and adjacent threats. It drops from eating, sleeping, safe terrain, and solitude.</p>
+    <h3>Kin Warning</h3>
+    <p>Smart Lurches (INT ≥ 0.6) can warn nearby relatives (>70% genetic similarity) of danger. Warned Lurches are more likely to flee or hide. This creates emergent kin selection — family groups survive better, but also compete for food.</p>
+  `,
+  godmode: `
+    <h3>God Mode</h3>
+    <p>Press <code>G</code> to open God Mode. Use the <strong>Severity slider</strong> (1–10) to control the magnitude of events. 5 is the default; 10 is apocalyptic.</p>
+    <h3>Environmental Events</h3>
+    <table>
+      <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
+      <tr><td><code>1</code></td><td>Drought</td><td>Slash food regen for N rounds</td></tr>
+      <tr><td><code>2</code></td><td>Flood</td><td>Water tiles expand outward</td></tr>
+      <tr><td><code>3</code></td><td>Wildfire</td><td>Forests burn to plains in spreading radius</td></tr>
+      <tr><td><code>4</code></td><td>Earthquake</td><td>Terrain scrambled in a radius</td></tr>
+      <tr><td><code>5</code></td><td>Ice Age</td><td>Global food reduction, deserts become tundra</td></tr>
+      <tr><td><code>6</code></td><td>Meteor</td><td>Instant destruction in blast radius</td></tr>
+      <tr><td><code>0</code></td><td>Fertile Season</td><td>Food regen boosted</td></tr>
+    </table>
+    <h3>Biological Events</h3>
+    <table>
+      <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
+      <tr><td><code>7</code></td><td>Virus</td><td>Spreads between adjacent Lurches</td></tr>
+      <tr><td><code>8</code></td><td>Plague</td><td>Targets low-Adaptability Lurches</td></tr>
+      <tr><td><code>9</code></td><td>Mutation Burst</td><td>Mutation rate spikes — wild offspring</td></tr>
+      <tr><td><code>F</code></td><td>Fertility Wave</td><td>All Lurches get fertility boost</td></tr>
+      <tr><td><code>B</code></td><td>Bottleneck</td><td>Kill a percentage randomly</td></tr>
+      <tr><td><code>R</code></td><td>Rejuvenation</td><td>Heal and refresh all Lurches</td></tr>
+    </table>
+    <h3>Direct Tools</h3>
+    <p>Select a tool, then click the grid to apply it:</p>
+    <p><code>L</code> <strong>Smite</strong> — kill a Lurch instantly. <code>V</code> <strong>Bless</strong> — fully heal a Lurch. <code>P</code> <strong>Place Food</strong> — max food on a cell. <code>W</code> <strong>Build Wall</strong> — impassable terrain.</p>
+  `,
+  controls: `
+    <h3>Keyboard Controls</h3>
+    <table>
+      <tr><th>Key</th><th>Action</th></tr>
+      <tr><td><code>Space</code></td><td>Pause / Resume simulation</td></tr>
+      <tr><td><code>+ / -</code></td><td>Speed up / slow down (5 levels: 1x to Max)</td></tr>
+      <tr><td><code>N</code></td><td>Step one round (while paused)</td></tr>
+      <tr><td><code>G</code></td><td>Toggle God Mode panel</td></tr>
+      <tr><td><code>?</code></td><td>Toggle this help panel</td></tr>
+      <tr><td><code>F</code></td><td>Follow selected Lurch (center view on it)</td></tr>
+      <tr><td><code>Arrow Keys</code></td><td>Scroll the grid</td></tr>
+      <tr><td><code>Escape</code></td><td>Close God Mode / Help</td></tr>
+    </table>
+    <h3>Mouse</h3>
+    <p><strong>Click</strong> a Lurch on the grid to inspect it — see its genome, stats, parents, children, and last action in the side panel.</p>
+    <p>In God Mode, select a tool then <strong>click</strong> the grid to apply it (smite, bless, place food, or build wall).</p>
+    <h3>Tips</h3>
+    <p>Start paused and click around to see the initial population. Press Space to run, then watch the event log and population sparkline. When things get boring — drop a meteor.</p>
+  `
+};
+
+function initHelp() {
+  const overlay = document.getElementById('help-overlay');
+  const body = document.getElementById('help-body');
+  const tabs = document.querySelectorAll('.help-tab');
+  const closeBtn = document.getElementById('help-close');
+  const helpBtn = document.getElementById('help-btn');
+
+  function showTab(tabId) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+    body.innerHTML = HELP_CONTENT[tabId] || '';
+  }
+
+  tabs.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+  closeBtn.addEventListener('click', () => overlay.classList.remove('visible'));
+  helpBtn.addEventListener('click', () => {
+    overlay.classList.toggle('visible');
+    if (overlay.classList.contains('visible')) showTab('overview');
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('visible');
+  });
+
+  // Show overview by default
+  showTab('overview');
+}
+
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+</script>
+</body>
+</html>
