@@ -188,7 +188,7 @@
     border: 2px solid #aa44aa;
     padding: 16px 20px;
     z-index: 100;
-    min-width: 360px;
+    min-width: 420px;
     box-shadow: 0 0 40px rgba(170, 68, 170, 0.3);
   }
   #godmode-panel h2 {
@@ -339,8 +339,8 @@
     background: #10101c;
     border: 1px solid #3a3a5a;
     border-radius: 8px;
-    width: 580px;
-    max-height: 80vh;
+    width: 660px;
+    height: 75vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 12px 60px rgba(0,0,0,0.6);
@@ -415,7 +415,7 @@
   <div class="setup-card">
     <div class="setup-header">
       <h1>LURCHES</h1>
-      <div class="subtitle">"Nostalgic terrarium you can smite"</div>
+      <div class="subtitle">"A genetic simulation sandbox with an ASCII attitude."</div>
       <div class="ascii-art">
 ~..##^^..~..<span style="color:#ff4444">@</span>.##^^""^^##...<span style="color:#44ff44">@</span>..~<br>
 ..##<span style="color:#4488ff">@</span>^""^^##....##^^""<span style="color:#ffff44">@</span>^##...<br>
@@ -429,13 +429,13 @@
         <div class="setup-field">
           <label>Map</label>
           <select id="map-preset">
+            <option value="random" selected>Random</option>
             <option value="pangaea">Pangaea</option>
             <option value="eden">Eden</option>
             <option value="crucible">The Crucible</option>
             <option value="archipelago">Archipelago</option>
             <option value="ringworld">Ring World</option>
             <option value="waterworld">Waterworld</option>
-            <option value="random">Random</option>
           </select>
         </div>
         <div class="setup-field">
@@ -458,7 +458,7 @@
             <option value="balanced">Balanced</option>
             <option value="warriors">Warriors</option>
             <option value="thinkers">Thinkers</option>
-            <option value="breeders">Breeders</option>
+            <option value="survivors">Survivors</option>
             <option value="chaos">Chaos</option>
             <option value="specialists">Specialists</option>
           </select>
@@ -539,17 +539,11 @@
         <button class="gm-btn" data-event="iceage"><kbd>5</kbd> Ice Age</button>
         <button class="gm-btn" data-event="meteor"><kbd>6</kbd> Meteor</button>
       </div>
-      <div class="gm-row">
-        <button class="gm-btn" data-event="fertile"><kbd>0</kbd> Fertile Season</button>
-      </div>
       <div class="gm-divider"></div>
       <div class="panel-title">Biological Events</div>
       <div class="gm-row">
         <button class="gm-btn" data-event="plague"><kbd>7</kbd> Plague</button>
-      </div>
-      <div class="gm-row">
         <button class="gm-btn" data-event="mutationburst"><kbd>8</kbd> Mutation Burst</button>
-        <button class="gm-btn" data-event="fertwave"><kbd>F</kbd> Fertility Wave</button>
       </div>
       <div class="gm-row">
         <button class="gm-btn" data-event="bottleneck"><kbd>B</kbd> Cull (kill 50%)</button>
@@ -562,7 +556,7 @@
         <button class="gm-btn" data-tool="bless"><kbd>V</kbd> Bless ✨</button>
       </div>
       <div class="gm-row">
-        <button class="gm-btn" data-tool="spawn"><kbd>S</kbd> Spawn Lurch</button>
+        <button class="gm-btn" data-tool="spawn"><kbd>S</kbd> Spawn</button>
         <button class="gm-btn" data-tool="food"><kbd>P</kbd> Place Food</button>
         <button class="gm-btn" data-tool="wall"><kbd>W</kbd> Build Wall</button>
       </div>
@@ -698,18 +692,17 @@ const TERRAIN_IDS = Object.keys(TERRAIN);
 // ============================================================
 // GENE DEFINITIONS
 // ============================================================
-const GENES = ['vitality','speed','strength','intelligence','fertility','adaptability','perception','size'];
+const GENES = ['vitality','speed','strength','intelligence','adaptability','perception','size'];
 const GENE_COLORS = {
   vitality:     '#44ff44',
   speed:        '#44ffff',
   strength:     '#ff4444',
   intelligence: '#4488ff',
-  fertility:    '#ff44ff',
   adaptability: '#ffff44',
   perception:   '#cccccc',
   size:         '#ffffff',
 };
-const GENE_SHORT = { vitality:'VIT', speed:'SPD', strength:'STR', intelligence:'INT', fertility:'FER', adaptability:'ADP', perception:'PER', size:'SIZ' };
+const GENE_SHORT = { vitality:'VIT', speed:'SPD', strength:'STR', intelligence:'INT', adaptability:'ADP', perception:'PER', size:'SIZ' };
 
 // ============================================================
 // CONFIG
@@ -820,13 +813,32 @@ class World {
     return null;
   }
 
-  // Regenerate food
+  // Regenerate food — cooperator clusters boost regrowth (farming)
   regenFood(foodMultiplier = 1) {
+    // Pre-compute cooperator density map for food cultivation
+    const coopMap = new Float32Array(this.w * this.h);
+    for (const l of this.lurches) {
+      if (!l.alive) continue;
+      const cs = (l.genome.intelligence + l.genome.perception) / 2
+               - (l.genome.strength + l.genome.size) / 4;
+      if (cs > 0.2) {
+        // Cooperator boosts food in range 2
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = this.wrapX(l.x + dx);
+            const ny = this.wrapY(l.y + dy);
+            coopMap[ny * this.w + nx] += cs * 0.15;
+          }
+        }
+      }
+    }
+
     for (let i = 0; i < this.w * this.h; i++) {
       const t = this.terrain[i];
-      const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap; // enhanced terrain holds more food
+      const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap;
       if (this.food[i] < cap) {
-        this.food[i] = Math.min(cap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier);
+        const cultivation = Math.min(coopMap[i], 2); // cap cultivation bonus at 2x
+        this.food[i] = Math.min(cap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier * (1 + cultivation));
       }
     }
   }
@@ -1023,19 +1035,23 @@ class Lurch {
     this.id = id;
     this.x = x;
     this.y = y;
-    this.genome = genome; // { vitality, speed, strength, intelligence, fertility, adaptability, perception, size }
+    this.genome = genome; // { vitality, speed, strength, intelligence, adaptability, perception, size }
     this.parentA = parentA;
     this.parentB = parentB;
     this.children = [];
 
     // Derived stats
-    this.maxHP = 40 + genome.vitality * 60 + genome.size * 30;
+    const specPen = 1 - genome.adaptability * 0.15;
+    this.maxHP = 50 + genome.size * specPen * 60 + genome.vitality * 15; // SIZ primary, VIT minor toughness
     this.hp = this.maxHP;
     this.hunger = 20;
     this.energy = 80;
     this.stress = 0;
     this.age = 0;
-    this.maxAge = CONFIG.baseLifespan + genome.vitality * CONFIG.maxLifespan;
+    // Lifespan: flat base + genome-derived variance, not VIT-driven
+    // Use genome hash for deterministic but varied lifespans
+    const lifeVar = ((genome.speed * 7 + genome.strength * 11 + genome.intelligence * 13 + genome.perception * 17 + genome.size * 19 + genome.adaptability * 23) % 1);
+    this.maxAge = CONFIG.baseLifespan + lifeVar * CONFIG.maxLifespan * 0.5;
     this.juvenile = true;
     this.juvenileTimer = CONFIG.juvenileDuration;
     this.alive = true;
@@ -1082,12 +1098,17 @@ class Lurch {
     return Math.max(0, this.genome.intelligence - stressPenalty);
   }
 
+  // Jack of all trades, master of none: high ADP slightly suppresses other genes
+  get specPenalty() {
+    return 1 - this.genome.adaptability * 0.15;
+  }
+
   get perceptionRange() {
-    return 2 + Math.floor(this.genome.perception * 6);
+    return 2 + Math.floor(this.genome.perception * this.specPenalty * 6);
   }
 
   get moveSpeed() {
-    return 1 + Math.floor(this.genome.speed * 2);
+    return 1 + Math.floor(this.genome.speed * this.specPenalty * 2);
   }
 
   genomeSimilarity(other) {
@@ -1113,11 +1134,24 @@ const Genetics = {
     return genome;
   },
 
-  crossover(genomeA, genomeB, rng) {
+  crossover(genomeA, genomeB, rng, traitFreq) {
     const child = {};
+    const expected = 1 / GENES.length; // ~0.143 for 7 genes
     for (const g of GENES) {
-      // Weighted blend, not just average
-      const w = rng.range(0.2, 0.8);
+      let w = rng.range(0.2, 0.8);
+      // Frequency-dependent inheritance: rare traits blend toward stronger parent
+      if (traitFreq) {
+        const freq = traitFreq[g] || 0;
+        if (freq < expected) {
+          const rarityBoost = ((expected - freq) / expected) * 0.15;
+          // Shift weight toward whichever parent has higher value for this gene
+          if (genomeA[g] >= genomeB[g]) {
+            w = Math.min(0.95, w + rarityBoost);
+          } else {
+            w = Math.max(0.05, w - rarityBoost);
+          }
+        }
+      }
       child[g] = genomeA[g] * w + genomeB[g] * (1 - w);
     }
     return child;
@@ -1139,8 +1173,8 @@ const Genetics = {
     return result;
   },
 
-  reproduce(parentA, parentB, rng) {
-    const blended = Genetics.crossover(parentA.genome, parentB.genome, rng);
+  reproduce(parentA, parentB, rng, traitFreq) {
+    const blended = Genetics.crossover(parentA.genome, parentB.genome, rng, traitFreq);
     const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
     return mutated;
   }
@@ -1150,11 +1184,11 @@ const Genetics = {
 // LURCH PRESETS
 // ============================================================
 const LURCH_PRESETS = {
-  balanced:    { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, fertility:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.15 },
-  warriors:    { means: { vitality:0.7, speed:0.5, strength:0.8, intelligence:0.3, fertility:0.3, adaptability:0.4, perception:0.5, size:0.7 }, variance: 0.12 },
-  thinkers:    { means: { vitality:0.4, speed:0.3, strength:0.2, intelligence:0.8, fertility:0.4, adaptability:0.5, perception:0.7, size:0.3 }, variance: 0.12 },
-  breeders:    { means: { vitality:0.4, speed:0.4, strength:0.3, intelligence:0.3, fertility:0.9, adaptability:0.6, perception:0.4, size:0.3 }, variance: 0.12 },
-  chaos:       { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, fertility:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.35 },
+  balanced:    { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.15 },
+  warriors:    { means: { vitality:0.7, speed:0.5, strength:0.8, intelligence:0.3, adaptability:0.4, perception:0.5, size:0.7 }, variance: 0.12 },
+  thinkers:    { means: { vitality:0.4, speed:0.3, strength:0.2, intelligence:0.8, adaptability:0.5, perception:0.7, size:0.3 }, variance: 0.12 },
+  survivors:   { means: { vitality:0.7, speed:0.4, strength:0.4, intelligence:0.4, adaptability:0.8, perception:0.5, size:0.5 }, variance: 0.12 },
+  chaos:       { means: { vitality:0.5, speed:0.5, strength:0.5, intelligence:0.5, adaptability:0.5, perception:0.5, size:0.5 }, variance: 0.35 },
   specialists: null, // handled specially
 };
 
@@ -1174,6 +1208,28 @@ const DecisionEngine = {
       }
     }
 
+    // Settlement stickiness — cooperators in clusters stay put
+    const settleCS = (lurch.genome.intelligence + lurch.genome.perception) / 2
+                   - (lurch.genome.strength + lurch.genome.size) / 4;
+    if (settleCS > 0.2 && lurch.hunger < 50 && lurch.stress < 60) {
+      let sNeighbors = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const ally = world.getLurch(nx, ny);
+        if (ally && ally.alive) {
+          const cs = (ally.genome.intelligence + ally.genome.perception) / 2
+                   - (ally.genome.strength + ally.genome.size) / 4;
+          if (cs > 0.2) sNeighbors++;
+        }
+      }
+      if (sNeighbors >= 2) {
+        const stayChance = Math.min(0.8, sNeighbors * 0.2);
+        if (world.rng.next() < stayChance) {
+          lurch.lastAction = 'settled';
+          return { action: 'nothing' };
+        }
+      }
+    }
+
     // Tier determination
     if (eInt < 0.2) return DecisionEngine.instinctive(lurch, world);
     if (eInt < 0.5) return DecisionEngine.aware(lurch, world);
@@ -1181,12 +1237,13 @@ const DecisionEngine = {
     return DecisionEngine.brilliant(lurch, world);
   },
 
-  // Scan surroundings for food, threats, mates
+  // Scan surroundings for food, threats, mates, teachers
   scan(lurch, world, range) {
     const foods = [];
     const threats = [];
     const mates = [];
     const empty = [];
+    const teachers = [];
 
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
@@ -1203,6 +1260,10 @@ const DecisionEngine = {
           if (!lurch.juvenile && !other.juvenile && d <= 1) {
             mates.push({ lurch: other, x: nx, y: ny });
           }
+          // Track nearby teachers (high INT lurches)
+          if (other.genome.intelligence > 0.5) {
+            teachers.push({ lurch: other, x: nx, y: ny, dist: d, int: other.genome.intelligence });
+          }
         }
         if (!other && food > 1 && !world.getTerrain(nx, ny).impassable) {
           foods.push({ x: nx, y: ny, food, dist: d });
@@ -1212,7 +1273,16 @@ const DecisionEngine = {
         }
       }
     }
-    return { foods, threats, mates, empty };
+    // Shuffle to prevent directional bias from scan order
+    const shuffle = (arr) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = world.rng.nextInt(i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    shuffle(foods); shuffle(threats); shuffle(empty); shuffle(mates); shuffle(teachers);
+    return { foods, threats, mates, empty, teachers };
   },
 
   // Direction toward a target (toroidal)
@@ -1225,13 +1295,41 @@ const DecisionEngine = {
   },
 
   instinctive(lurch, world) {
-    const { foods, threats, mates } = this.scan(lurch, world, 2);
+    const { foods, threats, mates, empty } = this.scan(lurch, world, 2);
 
     // If very hungry, eat if food here
     if (lurch.hunger > 50 && world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
 
     // If very low energy, sleep
     if (lurch.energy < 15) return { action: 'sleep' };
+
+    // Aggression: dumb brutes pick fights with weaker neighbors
+    // Low INT + high STR/SIZ = aggressive
+    const aggression = (lurch.genome.strength + lurch.genome.size) / 2 - (lurch.genome.intelligence + lurch.genome.perception) / 2;
+    if (aggression > 0.1 && lurch.energy > 20) {
+      // Look for weaker adjacent lurches to bully
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const other = world.getLurch(nx, ny);
+        if (other && other.alive && other !== lurch) {
+          const myPower = lurch.genome.strength * 0.6 + lurch.genome.size * 0.4;
+          const theirPower = other.genome.strength * 0.6 + other.genome.size * 0.4;
+          // Threat deterrence: count cooperator allies near target
+          let coopAllies = 0;
+          for (const [ax, ay] of world.neighbors8(other.x, other.y)) {
+            const ally = world.getLurch(ax, ay);
+            if (ally && ally.alive && ally !== lurch && ally !== other) {
+              const cs = (ally.genome.intelligence + ally.genome.perception) / 2
+                       - (ally.genome.strength + ally.genome.size) / 4;
+              if (cs > 0.2) coopAllies++;
+            }
+          }
+          const deterrence = 1 + coopAllies * 0.25; // each ally makes target look 25% tougher
+          if (myPower > theirPower * 0.8 * deterrence && world.rng.next() < aggression) {
+            return { action: 'fight', target: other };
+          }
+        }
+      }
+    }
 
     // Fight or flee from adjacent threat (coin flip)
     if (threats.length > 0 && threats[0].dist <= 1) {
@@ -1278,6 +1376,13 @@ const DecisionEngine = {
     // Reproduce
     if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35 && lurch.hunger < 60) {
       return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
+    }
+
+    // Teacher-seeking: taught lurches drift toward teachers instead of wandering
+    if (lurch.taught > 0 && scan.teachers.length > 0) {
+      scan.teachers.sort((a, b) => b.int - a.int);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.teachers[0].x, scan.teachers[0].y);
+      return { action: 'move', dir: [dx, dy] };
     }
 
     // Wander
@@ -1338,6 +1443,19 @@ const DecisionEngine = {
 
     if (lurch.energy < 30) return { action: 'sleep' };
 
+    // Teacher-seeking: taught lurches prefer areas near teachers over random food
+    if (lurch.taught > 0 && scan.teachers.length > 0) {
+      scan.teachers.sort((a, b) => b.int - a.int);
+      const teacher = scan.teachers[0];
+      // If already adjacent to teacher, hold position or eat nearby
+      if (teacher.dist <= 1) {
+        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+        return { action: 'nothing' };
+      }
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, teacher.x, teacher.y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
     // Wander toward food areas
     if (scan.foods.length > 0) {
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.foods[0].x, scan.foods[0].y);
@@ -1377,8 +1495,18 @@ const DecisionEngine = {
     // Smart threat assessment
     if (scan.threats.length > 0) {
       const threat = scan.threats[0];
-      // Only fight if we have significant advantage
-      if (threat.dist <= 1 && lurch.genome.strength > threat.lurch.genome.strength * 1.3 && lurch.hp / lurch.maxHP > 0.6) {
+      // Only fight if we have significant advantage — factor in cooperator allies
+      let tCoopAllies = 0;
+      for (const [ax, ay] of world.neighbors8(threat.x, threat.y)) {
+        const ally = world.getLurch(ax, ay);
+        if (ally && ally.alive && ally !== lurch && ally !== threat.lurch) {
+          const cs = (ally.genome.intelligence + ally.genome.perception) / 2
+                   - (ally.genome.strength + ally.genome.size) / 4;
+          if (cs > 0.2) tCoopAllies++;
+        }
+      }
+      const tDeterrence = 1 + tCoopAllies * 0.25;
+      if (threat.dist <= 1 && lurch.genome.strength > threat.lurch.genome.strength * 1.3 * tDeterrence && lurch.hp / lurch.maxHP > 0.6) {
         return { action: 'fight', target: threat.lurch };
       }
       // Otherwise retreat smartly
@@ -1428,6 +1556,22 @@ const DecisionEngine = {
     }
 
     if (lurch.energy < 35) return { action: 'sleep' };
+
+    // Teacher-seeking: brilliant taught lurches actively orbit teachers
+    if (lurch.taught > 0 && scan.teachers.length > 0) {
+      scan.teachers.sort((a, b) => b.int - a.int);
+      const teacher = scan.teachers[0];
+      if (teacher.dist <= 1) {
+        // Adjacent to teacher — hold position in good terrain, eat if possible
+        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+        if (terrain.safety >= 3) return { action: 'nothing' };
+      }
+      // Move toward teacher — they're a strategic asset
+      if (teacher.dist <= 4) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, teacher.x, teacher.y);
+        return { action: 'move', dir: [dx, dy] };
+      }
+    }
 
     // Territory behavior: return to known good area (high food, safe)
     if (terrain.safety >= 4 && world.getFood(lurch.x, lurch.y) > 1) {
@@ -1701,7 +1845,7 @@ const Events = {
         if (s.round % 5 === 0) {
           for (const l of w.lurches) {
             if (!l.alive) continue;
-            const coldResist = l.genome.vitality * 0.7 + l.genome.size * 0.3;
+            const coldResist = l.genome.vitality * 0.5 + l.genome.size * 0.3 + l.genome.adaptability * 0.2;
             if (w.rng.next() > coldResist) {
               l.hp -= coldDmg;
               if (l.hp <= 0) l.causeOfDeath = 'frostbite';
@@ -1760,7 +1904,7 @@ const Events = {
           if (!l.alive || !l.diseased) continue;
           for (const [nx, ny] of w.neighbors8(l.x, l.y)) {
             const other = w.getLurch(nx, ny);
-            if (other && other.alive && !other.diseased && w.rng.next() < spreadRate * (1 - other.genome.adaptability)) {
+            if (other && other.alive && !other.diseased && w.rng.next() < spreadRate * (1 - Math.sqrt(other.genome.vitality) * 0.7 - other.genome.adaptability * 0.2)) {
               other.diseased = true;
               other.diseaseTurns = 10 + w.rng.nextInt(10);
             }
@@ -1778,13 +1922,6 @@ const Events = {
     sim.log(`MUTATION BURST [${this._severity}] — mutation rate ×${mult.toFixed(0)} for ${dur} rounds`, 'event');
   },
 
-  fertwave(world, sim) {
-    const boost = 0.05 + this._severity * 0.04; // 0.09 to 0.45
-    for (const l of world.lurches) {
-      if (l.alive) l.genome.fertility = Math.min(1, l.genome.fertility + boost);
-    }
-    sim.log(`FERTILITY WAVE [${this._severity}] — all Lurches +${boost.toFixed(2)} fertility`, 'event');
-  },
 
   bottleneck(world, sim) {
     const killChance = 0.1 + this._severity * 0.08; // 0.18 to 0.9
@@ -1902,8 +2039,8 @@ class Simulation {
     if (preset === 'specialists') {
       // Two subpopulations
       const half = Math.floor(count / 2);
-      const meansA = { vitality:0.7, speed:0.3, strength:0.8, intelligence:0.3, fertility:0.5, adaptability:0.3, perception:0.4, size:0.7 };
-      const meansB = { vitality:0.4, speed:0.7, strength:0.2, intelligence:0.8, fertility:0.5, adaptability:0.7, perception:0.7, size:0.3 };
+      const meansA = { vitality:0.7, speed:0.3, strength:0.8, intelligence:0.3, adaptability:0.3, perception:0.4, size:0.7 };
+      const meansB = { vitality:0.4, speed:0.7, strength:0.2, intelligence:0.8, adaptability:0.7, perception:0.7, size:0.3 };
       for (let i = 0; i < half; i++) this.spawnLurch(Genetics.createGenome(meansA, 0.12, rng));
       for (let i = 0; i < count - half; i++) this.spawnLurch(Genetics.createGenome(meansB, 0.12, rng));
     } else {
@@ -1957,16 +2094,61 @@ class Simulation {
       lurch.warned = false; // Reset warnings
       lurch.taught = 0;    // Reset teaching bonus
     }
-    // High-INT lurches boost neighbors
+    // High-INT lurches boost neighbors — settlement amplification
     for (const lurch of alive) {
       if (lurch.genome.intelligence > 0.5) {
-        const teachPower = (lurch.genome.intelligence - 0.5) * 2; // 0→0 at 0.5, 1→1.0 at 1.0
+        // Count nearby cooperators for teaching amplification
+        let settlementBonus = 0;
+        for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+          const ally = world.getLurch(nx, ny);
+          if (ally && ally.alive && ally !== lurch) {
+            const cs = (ally.genome.intelligence + ally.genome.perception) / 2
+                     - (ally.genome.strength + ally.genome.size) / 4;
+            if (cs > 0.2) settlementBonus += 0.15; // each cooperator nearby boosts teaching 15%
+          }
+        }
+        const teachPower = (lurch.genome.intelligence - 0.5) * 2 * (1 + Math.min(settlementBonus, 0.6)); // cap at 60% boost
         for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
           const other = world.getLurch(nx, ny);
           if (other && other.alive && other !== lurch) {
             other.taught = Math.max(other.taught, teachPower); // take best teacher, don't stack
           }
         }
+      }
+    }
+
+    // --- Cooperation Phase (high INT+PER share food, reduce stress, heal nearby) ---
+    for (const lurch of alive) {
+      const coopScore = (lurch.genome.intelligence + lurch.genome.perception) / 2
+                      - (lurch.genome.strength + lurch.genome.size) / 4; // brutes don't cooperate
+      if (coopScore < 0.3 || lurch.hunger > 60) continue; // too dumb, too hungry, or too brutish
+
+      // Count nearby cooperator allies for healing
+      let nearbyCoops = 0;
+      // Share food with hungry adjacent neighbors
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const other = world.getLurch(nx, ny);
+        if (!other || !other.alive) continue;
+
+        // Count fellow cooperators
+        const otherCoop = (other.genome.intelligence + other.genome.perception) / 2
+                        - (other.genome.strength + other.genome.size) / 4;
+        if (otherCoop > 0.2) nearbyCoops++;
+
+        // Food sharing
+        if (other.hunger > lurch.hunger + 20) {
+          const share = Math.min(8, (other.hunger - lurch.hunger) * 0.2) * coopScore;
+          other.hunger = Math.max(0, other.hunger - share);
+          lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + share * 0.5);
+          other.stress = Math.max(0, other.stress - 3);
+          lurch.stress = Math.max(0, lurch.stress - 2);
+        }
+      }
+
+      // Cooperative healing: each nearby cooperator ally restores a bit of HP
+      if (nearbyCoops > 0 && lurch.hp < lurch.maxHP) {
+        const healAmt = Math.min(nearbyCoops * 1.5, lurch.maxHP * 0.03); // up to 3% maxHP per round
+        lurch.hp = Math.min(lurch.maxHP, lurch.hp + healAmt);
       }
     }
 
@@ -2014,19 +2196,51 @@ class Simulation {
       if (!target || !target.alive) continue;
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
-      const damage = lurch.genome.strength * 30 * (0.5 + rng.next() * 0.5);
-      const defense = target.genome.size * 10 + world.getTerrain(target.x, target.y).safety * 2;
-      const net = Math.max(1, damage - defense);
+      // Pack bonus: nearby brutes amplify attack power
+      let packAllies = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const ally = world.getLurch(nx, ny);
+        if (ally && ally.alive && ally !== target) {
+          const aggro = (ally.genome.strength + ally.genome.size) / 2
+                      - (ally.genome.intelligence + ally.genome.perception) / 2;
+          if (aggro > 0.1) packAllies++;
+        }
+      }
+      const packBonus = 1 + packAllies * 0.2; // each brute ally adds 20% attack
+      const attackPower = (lurch.genome.strength * 0.6 + lurch.genome.size * 0.4) * lurch.specPenalty * 50 * (0.5 + rng.next() * 0.5) * packBonus;
+      let defensePower = (target.genome.size * 0.5 + target.genome.strength * 0.3 + target.genome.adaptability * 0.2) * 8 + world.getTerrain(target.x, target.y).safety * 2;
+
+      // Cooperative defense: nearby cooperators rally to defend
+      let coopAllies = 0;
+      for (const [nx, ny] of world.neighbors8(target.x, target.y)) {
+        const ally = world.getLurch(nx, ny);
+        if (ally && ally.alive && ally !== lurch && ally !== target) {
+          const allyCoopScore = (ally.genome.intelligence + ally.genome.perception) / 2
+                              - (ally.genome.strength + ally.genome.size) / 4;
+          if (allyCoopScore > 0.2) coopAllies++;
+        }
+      }
+      if (coopAllies > 0) {
+        defensePower += coopAllies * 2; // each ally adds flat defense
+        Events.addVfx('cooperate', target.x, target.y, 10);
+      }
+
+      const net = Math.max(1, attackPower - defensePower);
       target.hp -= net;
       lurch.lastAction = `fight #${target.id}`;
       lurch.stress = Math.min(100, lurch.stress + 10);
       target.stress = Math.min(100, target.stress + 20);
       this.log(`#${lurch.id} attacked #${target.id} (${Math.round(net)} dmg)`, 'combat');
       if (target.hp <= 0) {
+        Events.addVfx('combat', target.x, target.y, 12);
         target.alive = false;
         target.causeOfDeath = 'combat';
         world.removeLurch(target);
         this.totalDeaths++;
+        // Victor steals food — the spoils of war (pack bonus = bigger spoils)
+        const spoilsMult = 1 + packAllies * 0.3;
+        lurch.hunger = Math.max(0, lurch.hunger - 20 * spoilsMult);
+        lurch.energy = Math.min(100, lurch.energy + 15 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
       }
     }
@@ -2072,7 +2286,14 @@ class Simulation {
       lurch.sleeping = false;
     }
 
-    // Reproduction
+    // Reproduction — compute trait frequencies for frequency-dependent inheritance
+    const aliveForRepro = world.lurches.filter(l => l.alive);
+    const traitFreq = {};
+    for (const g of GENES) traitFreq[g] = 0;
+    for (const l of aliveForRepro) traitFreq[l.dominantGene]++;
+    const popSize = aliveForRepro.length || 1;
+    for (const g of GENES) traitFreq[g] /= popSize;
+
     const effMutRate = CONFIG.mutationRate * Events.mutationMultiplier;
     for (const { lurch, decision } of decisions) {
       if (decision.action !== 'reproduce' || !lurch.alive) continue;
@@ -2082,21 +2303,30 @@ class Simulation {
       if (lurch.energy < CONFIG.reproduceEnergyCost || lurch.hunger > 70) continue;
       if (mate.energy < CONFIG.reproduceEnergyCost * 0.5 || mate.hunger > 70) continue;
 
+      // Fertility window: full fertility until 60% of max age, tapers to zero at 80%
+      const fertileEnd = 0.8;
+      const taperStart = 0.6;
+      const agePctL = lurch.age / lurch.maxAge;
+      const agePctM = mate.age / mate.maxAge;
+      const fertilityL = agePctL < taperStart ? 1 : agePctL >= fertileEnd ? 0 : 1 - (agePctL - taperStart) / (fertileEnd - taperStart);
+      const fertilityM = agePctM < taperStart ? 1 : agePctM >= fertileEnd ? 0 : 1 - (agePctM - taperStart) / (fertileEnd - taperStart);
+      if (fertilityL <= 0 || fertilityM <= 0) { lurch.lastAction = 'too-old'; continue; }
+
       // Check adjacency
       if (world.chebyshev(lurch.x, lurch.y, mate.x, mate.y) > 1) continue;
 
-      // Success chance: diminishing returns on fertility (pow 1.4 curve)
-      const rawFert = (lurch.genome.fertility + mate.genome.fertility) / 2;
-      let fertChance = Math.pow(rawFert, 1.4) * CONFIG.birthRate; // global birth rate multiplier
+      // Success chance based on health — VIT no longer directly boosts reproduction
+      const healthScore = (lurch.hp / lurch.maxHP + mate.hp / mate.maxHP) / 2;
+      let reproChance = healthScore * 0.6 * CONFIG.birthRate * Math.min(fertilityL, fertilityM);
 
       // Local density penalty: crowded areas breed less
       let neighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         if (world.getLurch(nx, ny)) neighbors++;
       }
-      if (neighbors >= 4) fertChance *= Math.max(0.1, 1 - (neighbors - 3) * 0.15);
+      if (neighbors >= 4) reproChance *= Math.max(0.1, 1 - (neighbors - 3) * 0.15);
 
-      if (rng.next() > fertChance) {
+      if (rng.next() > reproChance) {
         lurch.lastAction = 'repro-fail';
         continue;
       }
@@ -2106,7 +2336,7 @@ class Simulation {
       if (!cell) { lurch.lastAction = 'repro-no-room'; continue; }
 
       // Create offspring
-      const childGenome = Genetics.reproduce(lurch, mate, rng);
+      const childGenome = Genetics.reproduce(lurch, mate, rng, traitFreq);
       // Apply mutation multiplier
       const finalGenome = Events.mutationMultiplier > 1
         ? Genetics.mutate(childGenome, effMutRate, rng)
@@ -2127,10 +2357,10 @@ class Simulation {
 
       lurch.energy -= CONFIG.reproduceEnergyCost;
       mate.energy -= CONFIG.reproduceEnergyCost * 0.5;
-      // Set reproduction cooldown: 2-5 rounds (high fert = shorter cooldown)
-      const cooldown = Math.round(5 - rawFert * 3);
+      // Set reproduction cooldown: 4-6 rounds (healthy = shorter cooldown)
+      const cooldown = Math.round(6 - healthScore * 2);
       lurch.reproCooldown = cooldown;
-      mate.reproCooldown = Math.round(cooldown * 0.6);
+      mate.reproCooldown = Math.round(cooldown * 0.7);
       lurch.lastAction = `reproduce → #${child.id}`;
       this.totalBirths++;
       this.log(`#${lurch.id} × #${mate.id} → offspring #${child.id}`, 'birth');
@@ -2226,7 +2456,7 @@ class Simulation {
       }
 
       // Hunger
-      const metabolism = 1 + lurch.genome.vitality * 0.5 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.fertility * 0.5;
+      const metabolism = 1 + lurch.genome.vitality * 0.3 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.adaptability * 0.6;
       lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5);
 
       // Energy passive drain
@@ -2238,21 +2468,39 @@ class Simulation {
       let stressDelta = -2; // Natural decay
       if (lurch.hunger > 70) stressDelta += 5;
       if (lurch.hp / lurch.maxHP < 0.3) stressDelta += 8;
-      // Crowding
+      // Crowding — cooperators tolerate crowds better (settlement bonus)
       let adjacent = 0;
+      let coopNeighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
-        if (world.getLurch(nx, ny)) adjacent++;
+        const neighbor = world.getLurch(nx, ny);
+        if (neighbor) {
+          adjacent++;
+          const ncs = (neighbor.genome.intelligence + neighbor.genome.perception) / 2
+                    - (neighbor.genome.strength + neighbor.genome.size) / 4;
+          if (ncs > 0.2) coopNeighbors++;
+        }
       }
-      if (adjacent > 3) stressDelta += adjacent * 2;
+      const lurchCoopScore = (lurch.genome.intelligence + lurch.genome.perception) / 2
+                           - (lurch.genome.strength + lurch.genome.size) / 4;
+      // Cooperators in cooperator-heavy areas feel less crowding stress
+      const crowdResist = (lurchCoopScore > 0.2 && coopNeighbors >= 2) ? 0.4 : 0;
+      if (adjacent > 3) stressDelta += adjacent * 2 * (1 - crowdResist);
       // Safe terrain relief
       if (world.getTerrain(lurch.x, lurch.y).safety >= 4) stressDelta -= 3;
       lurch.stress = Math.max(0, Math.min(100, lurch.stress + stressDelta));
 
-      // Disease
+      // Disease — VIT is primary immune system
       if (lurch.diseased) {
-        lurch.hp -= CONFIG.diseaseDamage * (1 - lurch.genome.adaptability * 0.5);
-        lurch.diseaseTurns--;
+        lurch.hp -= CONFIG.diseaseDamage * (1 - Math.sqrt(lurch.genome.vitality) * 0.6);
+        // High VIT fights off disease faster (burns through turns quicker)
+        const immuneBoost = 1 + lurch.genome.vitality * 0.5;
+        lurch.diseaseTurns -= immuneBoost;
         if (lurch.diseaseTurns <= 0) lurch.diseased = false;
+      }
+
+      // VIT passive healing: constitution helps recover from injury/sickness
+      if (lurch.hp < lurch.maxHP && !lurch.diseased && lurch.hunger < 60) {
+        lurch.hp = Math.min(lurch.maxHP, lurch.hp + lurch.genome.vitality * 2);
       }
 
       // Terrain bonuses
@@ -2264,7 +2512,7 @@ class Simulation {
       }
       // Terrain hazards
       if (terrain.drowning && lurch.genome.adaptability < 0.5 && !lurch.hidden) {
-        if (rng.next() < CONFIG.drownChance * (1 - lurch.genome.adaptability)) {
+        if (rng.next() < CONFIG.drownChance * (1 - Math.sqrt(lurch.genome.adaptability))) {
           lurch.hp -= 20;
           if (lurch.hp <= 0) lurch.causeOfDeath = 'drowning';
         }
@@ -2272,7 +2520,7 @@ class Simulation {
       if (terrain === TERRAIN.DESERT) {
         lurch.energy = Math.max(0, lurch.energy - CONFIG.desertEnergyDrain);
       }
-      if (terrain.disease && !lurch.diseased && rng.next() < CONFIG.diseaseChance * (1 - lurch.genome.adaptability * 0.7)) {
+      if (terrain.disease && !lurch.diseased && rng.next() < CONFIG.diseaseChance * (1 - Math.sqrt(lurch.genome.vitality) * 0.7)) {
         lurch.diseased = true;
         lurch.diseaseTurns = 10 + rng.nextInt(10);
       }
@@ -2545,6 +2793,22 @@ class Renderer {
         const g = life > 0.7 ? Math.floor(255 * (1 - (life - 0.7) * 3)) : Math.floor(100 * life);
         ctx.fillStyle = `rgba(${r}, ${g}, 0, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
+      } else if (vfx.type === 'combat') {
+        const pulse = Math.sin(now / 50) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(255, 20, 20, ${life * 0.7 * (0.5 + pulse * 0.5)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+        ctx.globalAlpha = life * 0.9;
+        ctx.fillStyle = '#ff4444';
+        ctx.fillText('\u2694', px + halfCellW, py + halfCellH);
+        ctx.globalAlpha = 1;
+      } else if (vfx.type === 'cooperate') {
+        const pulse = Math.sin(now / 60) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(30, 100, 255, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+        ctx.globalAlpha = life * 0.9;
+        ctx.fillStyle = '#4488ff';
+        ctx.fillText('\u2764', px + halfCellW, py + halfCellH);
+        ctx.globalAlpha = 1;
       } else if (vfx.type === 'sparkle') {
         const shimmer = Math.sin(now / 40 + vfx.x * 3 + vfx.y * 5) * 0.5 + 0.5;
         ctx.fillStyle = `rgba(100, 255, 140, ${life * 0.5 * (0.4 + shimmer * 0.6)})`;
@@ -2864,7 +3128,7 @@ function initInput() {
     // God mode hotkeys — work anytime (don't need popover open)
     const godEvents = {
       '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
-      '5': 'iceage', '6': 'meteor', '0': 'fertile',
+      '5': 'iceage', '6': 'meteor',
       '7': 'plague', '8': 'mutationburst',
       'b': 'bottleneck', 'B': 'bottleneck',
       'r': 'rejuvenation', 'R': 'rejuvenation',
@@ -3026,7 +3290,7 @@ function initInput() {
       Events[eventName](world, sim);
       // Log to timeline
       const name = eventName.charAt(0).toUpperCase() + eventName.slice(1);
-      const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', plague:'🦠', mutationburst:'🧪', fertwave:'🌸', bottleneck:'⚡', rejuvenation:'✨' };
+      const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', plague:'🦠', mutationburst:'🧪', bottleneck:'⚡', rejuvenation:'✨' };
       sim.addTimeline(icons[eventName] || '⚡', `${name} [${Events._severity}]`, 'godmode');
       renderer.render();
       ui.update();
@@ -3127,136 +3391,136 @@ document.getElementById('start-btn').addEventListener('click', () => {
 const HELP_CONTENT = {
   overview: `
     <h3>What is Lurches?</h3>
-    <p>Lurches is a genetic simulation sandbox. You seed a toroidal world with creatures called <strong style="color:#ccccee">Lurches</strong>, configure terrain and environmental parameters, then watch life unfold — intervening as a god when you choose.</p>
-    <p>The core joy is watching emergent behavior arise from simple rules: natural selection, genetic drift, competition, cooperation, and extinction — then throwing a wrench into it.</p>
+    <p>A genetic simulation sandbox. Seed a world with creatures called <strong style="color:#ccccee">Lurches</strong>, then watch evolution unfold — or intervene as a god.</p>
+    <p>The joy is emergence: simple rules produce natural selection, cooperation, warfare, settlements, and extinction. Then you throw a meteor at it.</p>
     <h3>How It Works</h3>
-    <p>Each round, every Lurch scans its surroundings and makes a decision — eat, move, fight, sleep, hide, reproduce, or do nothing. Their <strong style="color:#4488ff">intelligence</strong> determines <em>how well</em> they decide. After all decisions are made, actions resolve simultaneously: fights first, then movement, eating, reproduction, and rest.</p>
-    <p>Lurches have 8 heritable genes. When two mate, offspring get a blend of parent genes plus random mutations. Over time, natural selection shapes the population — the well-adapted thrive, the rest perish.</p>
+    <p>Each round, every Lurch scans its surroundings and decides what to do — eat, move, fight, cooperate, sleep, hide, reproduce, or settle. Their <strong style="color:#4488ff">intelligence</strong> determines how well they decide. Actions resolve simultaneously: fights first, then movement, eating, cooperation, reproduction, and rest.</p>
+    <p>Lurches carry 7 heritable genes. Offspring get a blend of both parents plus random mutations. Over time, natural selection shapes the population. The well-adapted thrive. The rest perish.</p>
     <h3>Your Role</h3>
-    <p>You're not trying to win. You're cultivating a world and observing consequences. Use <strong style="color:#dd66dd">God Mode</strong> to trigger droughts, meteors, plagues — or bless a favored Lurch. Watch what survives.</p>
+    <p>You're not trying to win. You're cultivating a world and watching consequences. Use <strong style="color:#dd66dd">God Mode</strong> to trigger droughts, meteors, plagues — or bless a favored Lurch. See what survives.</p>
   `,
   terrain: `
     <h3>Terrain Types</h3>
-    <p>The world is a toroidal grid (wraps in all directions — no edges). Each cell has a terrain type that affects food, movement, safety, and special hazards.</p>
+    <p>The world wraps in all directions (toroidal — no edges). Each cell has a terrain type affecting food, movement, safety, and hazards.</p>
     <table>
       <tr><th>Char</th><th>Terrain</th><th>Food</th><th>Move</th><th>Safety</th><th>Special</th></tr>
       <tr><td style="color:#2255aa">~</td><td>Deep Water</td><td>3</td><td>4</td><td>2</td><td style="color:#aa6644">Drowning risk</td></tr>
       <tr><td style="color:#7a8a5a">.</td><td>Plains</td><td>2</td><td>1</td><td>2</td><td>Exposed — easy to find, be found</td></tr>
       <tr><td style="color:#3a7a3a">#</td><td>Forest</td><td>4</td><td>2</td><td>4</td><td>Good foraging, hard to spot</td></tr>
+      <tr><td style="color:#ccaa33">∞</td><td>Fertile Plains</td><td>5</td><td>1</td><td>3</td><td style="color:#ccaa33">Rich farmland — discovery only</td></tr>
+      <tr><td style="color:#22cc44">♣</td><td>Lush Forest</td><td>6</td><td>2</td><td>5</td><td style="color:#22cc44">Shelter + HP regen — discovery only</td></tr>
       <tr><td style="color:#8a8a8a">^</td><td>Mountain</td><td>1</td><td>4</td><td>5</td><td>Fortress terrain, scarce food</td></tr>
       <tr><td style="color:#5a7a3a">"</td><td>Swamp</td><td>3</td><td>3</td><td>1</td><td style="color:#aa6644">Disease risk</td></tr>
       <tr><td style="color:#ba8a3a">░</td><td>Desert</td><td>0</td><td>2</td><td>3</td><td style="color:#aa6644">Drains energy</td></tr>
       <tr><td style="color:#4a99aa">≈</td><td>Shallows</td><td>2</td><td>2</td><td>3</td><td>Transition water/land</td></tr>
       <tr><td style="color:#7a5a8a">♠</td><td>Ruins</td><td>1</td><td>1</td><td>2</td><td>Mysterious</td></tr>
     </table>
-    <h3>Food</h3>
-    <p>Each cell regenerates food each round based on terrain type, up to a cap of 10. Lurches deplete food when they eat. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
+    <h3>Food &amp; Cultivation</h3>
+    <p>Each cell regenerates food each round up to a cap of 10. Lurches deplete food by eating. Overpopulated areas get stripped bare, forcing migration or starvation. Cooperator clusters boost food regrowth on nearby tiles — a form of farming that makes settlements self-sustaining.</p>
     <h3>Map Presets</h3>
-    <p><strong>Pangaea</strong> — one big continent. <strong>Eden</strong> — lush forests, abundant food. <strong>The Crucible</strong> — mostly desert with a tiny oasis. <strong>Archipelago</strong> — islands in deep water. <strong>Ring World</strong> — habitable ring around a deadly center. <strong>Waterworld</strong> — mostly ocean with scattered land.</p>
+    <p><strong>Random</strong> — procedural terrain. <strong>Pangaea</strong> — one continent. <strong>Eden</strong> — lush and abundant. <strong>The Crucible</strong> — harsh desert, tiny oasis. <strong>Archipelago</strong> — islands. <strong>Ring World</strong> — habitable ring, deadly center. <strong>Waterworld</strong> — mostly ocean.</p>
   `,
   lurches: `
     <h3>What Are Lurches?</h3>
-    <p>Lurches are creatures rendered as <strong style="color:#ff4444">@</strong> on the grid. Their color shows their dominant genetic trait — the gene with the highest value.</p>
+    <p>Creatures rendered as <strong style="color:#ccccee">@</strong> on the grid. Color shows their dominant gene — the one with the highest value.</p>
     <table>
-      <tr><th>Color</th><th>Dominant Trait</th></tr>
-      <tr><td><span class="chip" style="color:#ff4444">@</span></td><td>Strength — aggression, power</td></tr>
-      <tr><td><span class="chip" style="color:#4488ff">@</span></td><td>Intelligence — calm, calculating</td></tr>
-      <tr><td><span class="chip" style="color:#44ff44">@</span></td><td>Vitality — life force, endurance</td></tr>
-      <tr><td><span class="chip" style="color:#ff44ff">@</span></td><td>Fertility — reproductive drive</td></tr>
-      <tr><td><span class="chip" style="color:#44ffff">@</span></td><td>Speed — quick, electric</td></tr>
-      <tr><td><span class="chip" style="color:#ffff44">@</span></td><td>Adaptability — versatile</td></tr>
-      <tr><td><span class="chip" style="color:#cccccc">@</span></td><td>Perception — alert, aware</td></tr>
-      <tr><td><span class="chip" style="color:#ffffff">@</span></td><td>Size — imposing, dominant</td></tr>
+      <tr><th>Color</th><th>Dominant Gene</th></tr>
+      <tr><td><span style="color:#44ff44">@</span></td><td>Vitality — constitution, immune system</td></tr>
+      <tr><td><span style="color:#44ffff">@</span></td><td>Speed — quick, evasive</td></tr>
+      <tr><td><span style="color:#ff4444">@</span></td><td>Strength — aggression, combat power</td></tr>
+      <tr><td><span style="color:#4488ff">@</span></td><td>Intelligence — planning, teaching</td></tr>
+      <tr><td><span style="color:#ffff44">@</span></td><td>Adaptability — environmental resilience</td></tr>
+      <tr><td><span style="color:#cccccc">@</span></td><td>Perception — awareness, detection</td></tr>
+      <tr><td><span style="color:#ffffff">@</span></td><td>Size — bulk, hit points</td></tr>
     </table>
-    <h3>Health States</h3>
-    <p><strong>Bright</strong> = healthy. <strong>Normal</strong> = moderate. <strong>Dim</strong> = hungry/injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping.</p>
-    <h3>Death</h3>
-    <p>Lurches die from: starvation (hunger hits 100), combat (HP hits 0), old age, disease, drowning (deep water without adaptability), desert exposure, or divine smiting.</p>
+    <h3>Fighting &amp; War Bands</h3>
+    <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors for food and energy. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally, and bigger spoils from kills. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
+    <h3>Cooperation &amp; Settlements</h3>
+    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (allies boost each other's defense), passive healing, amplified teaching, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <h3>Life Cycle</h3>
+    <p><strong>Bright</strong> = healthy. <strong>Dim</strong> = hungry or injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping. Lurches die from starvation, combat, old age, disease, drowning, desert exposure, or divine smiting. Fertility tapers after 60% of max age and stops at 80% — elders teach and cooperate but don't breed.</p>
   `,
   genetics: `
-    <h3>The 8 Genes</h3>
-    <p>Every Lurch has 8 genes, each a value from 0.0 to 1.0. Higher is stronger but comes with tradeoffs — bigger Lurches need more food, faster ones burn more energy.</p>
+    <h3>The 7 Genes</h3>
+    <p>Each gene ranges from 0.0 to 1.0. Higher is stronger, but every gene has a metabolic cost — specialization comes with tradeoffs.</p>
     <table>
-      <tr><th>Gene</th><th>Effect</th><th>Tradeoff</th></tr>
-      <tr><td style="color:#44ff44">VIT</td><td>Max HP, lifespan, starvation resistance</td><td>Higher metabolism</td></tr>
-      <tr><td style="color:#44ffff">SPD</td><td>Tiles per move, flee success</td><td>Burns more energy</td></tr>
-      <tr><td style="color:#ff4444">STR</td><td>Combat damage, carrying capacity</td><td>Higher food needs</td></tr>
-      <tr><td style="color:#4488ff">INT</td><td>Decision quality, pathfinding, threat assessment</td><td>Slower reproduction</td></tr>
-      <tr><td style="color:#ff44ff">FER</td><td>Reproduction chance, potential litter size</td><td>Offspring start weaker</td></tr>
-      <tr><td style="color:#ffff44">ADP</td><td>Disease/terrain/temperature resistance</td><td>Jack of all trades</td></tr>
-      <tr><td style="color:#cccccc">PER</td><td>Detection range for food, threats, mates</td><td>Stress in crowds</td></tr>
-      <tr><td style="color:#ffffff">SIZ</td><td>HP bonus, combat advantage, intimidation</td><td>Needs more food, easier to spot</td></tr>
+      <tr><th>Gene</th><th>Primary Effect</th><th>Tradeoff</th></tr>
+      <tr><td style="color:#44ff44">VIT</td><td>Disease resistance, passive healing, cold tolerance</td><td>Metabolism cost</td></tr>
+      <tr><td style="color:#44ffff">SPD</td><td>Movement speed, flee success</td><td>Burns energy faster</td></tr>
+      <tr><td style="color:#ff4444">STR</td><td>Attack damage, fight initiation</td><td>Higher food needs</td></tr>
+      <tr><td style="color:#4488ff">INT</td><td>Decision quality, teaching, discovery</td><td>No direct combat bonus</td></tr>
+      <tr><td style="color:#ffff44">ADP</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
+      <tr><td style="color:#cccccc">PER</td><td>Scan range, threat detection, cooperation</td><td>Stress from crowds</td></tr>
+      <tr><td style="color:#ffffff">SIZ</td><td>Max HP, combat advantage</td><td>Needs most food, easy to spot</td></tr>
     </table>
-    <h3>Reproduction</h3>
-    <p>Two adjacent Lurches that both choose to reproduce create offspring. Genes are a <em>weighted blend</em> of both parents, plus random mutation. Rare macro-mutations can produce wildly different offspring.</p>
+    <h3>Inheritance</h3>
+    <p>Offspring genes are a weighted blend of both parents, plus gaussian mutation (with a 2% chance of a large macro-mutation). Rare traits — those below their expected population share — inherit more faithfully, a self-correcting mechanism inspired by frequency-dependent selection.</p>
+    <h3>Specialization Penalty</h3>
+    <p>A Lurch that dumps everything into one gene pays a penalty. The more lopsided the genome, the less effective the dominant trait becomes. Balanced genomes are rewarded — generalists aren't flashy, but they're efficient.</p>
     <h3>Natural Selection</h3>
-    <p>Over time, populations converge toward traits that fit their environment. Geographically separated groups diverge. Catastrophes create genetic bottlenecks. It's evolution in fast-forward.</p>
+    <p>Populations converge toward traits that fit their environment. Isolated groups diverge. Catastrophes create bottlenecks. Dominant traits trade places over time. It's evolution in fast-forward.</p>
   `,
   ai: `
-    <h3>Intelligence Tiers</h3>
-    <p>A Lurch's Intelligence gene doesn't just make them "better" — it changes <em>how</em> they think.</p>
-    <h3>Instinctive (INT 0.0–0.2)</h3>
-    <p>Purely reactive. If hungry, eat. If threatened, fight or flee (coin flip). Random movement. Mates with anyone adjacent.</p>
-    <h3>Aware (INT 0.3–0.5)</h3>
-    <p>Assesses immediate surroundings. Moves toward visible food. Flees from stronger opponents. Prefers hiding when weak.</p>
-    <h3>Strategic (INT 0.6–0.8)</h3>
-    <p>Pathfinds to food-rich areas. Evaluates mate quality. Retreats to safe terrain when injured. Stockpiles energy before reproducing.</p>
-    <h3>Brilliant (INT 0.9–1.0)</h3>
-    <p>Plans ahead. Avoids swamp disease and desert traps. Seeks optimal mates with complementary stats. Shows territorial behavior.</p>
+    <h3>Decision Making</h3>
+    <p>Intelligence doesn't just make Lurches "better" — it changes <em>how they think</em>. There are four behavioral tiers:</p>
+    <table>
+      <tr><th>Tier</th><th>INT Range</th><th>Behavior</th></tr>
+      <tr><td style="color:#aa6644">Instinctive</td><td>0.0 – 0.2</td><td>Reactive. Fight or flee randomly. Wander aimlessly. Eat whatever's adjacent.</td></tr>
+      <tr><td style="color:#aaaa44">Aware</td><td>0.3 – 0.5</td><td>Moves toward food. Flees stronger opponents. Follows teachers.</td></tr>
+      <tr><td style="color:#44aa88">Strategic</td><td>0.6 – 0.8</td><td>Pathfinds to food-rich areas. Retreats to safe terrain. Evaluates mates.</td></tr>
+      <tr><td style="color:#4488ff">Brilliant</td><td>0.9 – 1.0</td><td>Plans ahead. Avoids disease and desert. Shows territorial behavior. Seeks optimal mates.</td></tr>
+    </table>
     <h3>Stress</h3>
-    <p>High stress degrades effective Intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and adjacent threats. It drops from eating, sleeping, safe terrain, and solitude.</p>
-    <h3>Kin Warning</h3>
-    <p>Smart Lurches (INT ≥ 0.6) can warn nearby relatives (>70% genetic similarity) of danger. Warned Lurches are more likely to flee or hide. This creates emergent kin selection — family groups survive better, but also compete for food.</p>
+    <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>
     <h3>Teaching</h3>
-    <p>Lurches with INT above 0.5 automatically teach nearby neighbors, boosting their food gathering efficiency by up to 30%. Taught Lurches glow with a warm golden halo. The smarter the teacher, the bigger the bonus — but it only works for adjacent Lurches.</p>
+    <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In settlements, teaching is amplified — more cooperators nearby means stronger lessons.</p>
     <h3>Discovery</h3>
-    <p>When a high-INT Lurch is surrounded by a team with Strength, Size, and Perception, they can upgrade terrain: Desert becomes Plains or Forest, Plains becomes <span style="color:#ccaa33">Fertile Plains</span>, and Forest becomes <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain produces more food and has a higher food cap. <span style="color:#ccaa33">Fertile Plains</span> are rich farmland. <span style="color:#22cc44">Lush Forest</span> provides shelter (HP regen and stress relief). Discovery costs energy — hungry Lurches don't innovate. Disasters reset enhanced terrain back to base types.</p>
+    <p>A high-INT Lurch surrounded by a team (STR + SIZ + PER) can upgrade terrain: Desert → Plains/Forest, Plains → <span style="color:#ccaa33">Fertile Plains</span>, Forest → <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has higher food caps and special bonuses. Discovery costs energy — hungry Lurches don't innovate. Disasters reset enhanced terrain.</p>
+    <h3>Kin Warning</h3>
+    <p>Smart Lurches (INT ≥ 0.6) warn nearby relatives of danger. Warned kin are more likely to flee. This creates emergent kin selection — families survive better together.</p>
   `,
   godmode: `
     <h3>God Mode</h3>
-    <p>Press <code>G</code> to open God Mode. Use the <strong>Severity slider</strong> (1–10) to control the magnitude of events. 5 is the default; 10 is apocalyptic.</p>
+    <p>Press <code>G</code> to open. The <strong>Severity slider</strong> (1–10) controls magnitude. 5 is default; 10 is apocalyptic.</p>
     <h3>Environmental Events</h3>
     <table>
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
       <tr><td><code>1</code></td><td>Drought</td><td>Slash food regen for N rounds</td></tr>
       <tr><td><code>2</code></td><td>Flood</td><td>Water tiles expand outward</td></tr>
-      <tr><td><code>3</code></td><td>Wildfire</td><td>Forests burn to plains in spreading radius</td></tr>
+      <tr><td><code>3</code></td><td>Wildfire</td><td>Forests burn to plains, spreading</td></tr>
       <tr><td><code>4</code></td><td>Earthquake</td><td>Terrain scrambled in a radius</td></tr>
-      <tr><td><code>5</code></td><td>Ice Age</td><td>Global food reduction, deserts become tundra</td></tr>
+      <tr><td><code>5</code></td><td>Ice Age</td><td>Global food cut, cold damage</td></tr>
       <tr><td><code>6</code></td><td>Meteor</td><td>Instant destruction in blast radius</td></tr>
-      <tr><td><code>0</code></td><td>Fertile Season</td><td>Food regen boosted</td></tr>
     </table>
     <h3>Biological Events</h3>
     <table>
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
-      <tr><td><code>7</code></td><td>Plague</td><td>Patient zero + weak get infected, contagion spreads</td></tr>
+      <tr><td><code>7</code></td><td>Plague</td><td>Disease spreads from patient zero</td></tr>
       <tr><td><code>8</code></td><td>Mutation Burst</td><td>Mutation rate spikes — wild offspring</td></tr>
-      <tr><td><code>F</code></td><td>Fertility Wave</td><td>All Lurches get fertility boost</td></tr>
-      <tr><td><code>B</code></td><td>Bottleneck</td><td>Kill a percentage randomly</td></tr>
+      <tr><td><code>B</code></td><td>Cull</td><td>Kill 50% randomly</td></tr>
       <tr><td><code>R</code></td><td>Rejuvenation</td><td>Heal and refresh all Lurches</td></tr>
     </table>
     <h3>Direct Tools</h3>
-    <p>Select a tool, then click the grid to apply it:</p>
-    <p><code>L</code> <strong>Smite</strong> — kill a Lurch instantly. <code>V</code> <strong>Bless</strong> — fully heal a Lurch. <code>S</code> <strong>Spawn</strong> — create a new Lurch. <code>P</code> <strong>Place Food</strong> — max food on a cell. <code>W</code> <strong>Build Wall</strong> — impassable terrain. All tools support click-and-drag.</p>
+    <p>Select a tool, then click or drag on the grid:</p>
+    <p><code>L</code> <strong>Smite</strong> — instant kill. <code>V</code> <strong>Bless</strong> — full heal. <code>S</code> <strong>Spawn</strong> — new Lurch. <code>P</code> <strong>Place Food</strong> — max food. <code>W</code> <strong>Build Wall</strong> — impassable. Press ESC to deselect.</p>
   `,
   controls: `
-    <h3>Keyboard Controls</h3>
+    <h3>Keyboard</h3>
     <table>
       <tr><th>Key</th><th>Action</th></tr>
-      <tr><td><code>Space</code></td><td>Pause / Resume simulation</td></tr>
-      <tr><td><code>+ / -</code></td><td>Speed up / slow down (5 levels: 1x to Max)</td></tr>
+      <tr><td><code>Space</code></td><td>Pause / Resume</td></tr>
+      <tr><td><code>+ / -</code></td><td>Speed up / slow down (5 levels)</td></tr>
       <tr><td><code>N</code></td><td>Step one round (while paused)</td></tr>
-      <tr><td><code>G</code></td><td>Toggle God Mode panel</td></tr>
-      <tr><td><code>?</code></td><td>Toggle this help panel</td></tr>
-      <tr><td><code>F</code></td><td>Follow selected Lurch (center view on it)</td></tr>
+      <tr><td><code>G</code></td><td>Toggle God Mode</td></tr>
+      <tr><td><code>?</code></td><td>Toggle this guide</td></tr>
+      <tr><td><code>F</code></td><td>Follow selected Lurch</td></tr>
       <tr><td><code>Arrow Keys</code></td><td>Scroll the grid</td></tr>
-      <tr><td><code>Escape</code></td><td>Close God Mode / Help</td></tr>
+      <tr><td><code>Escape</code></td><td>Close panels / deselect tool</td></tr>
     </table>
     <h3>Mouse</h3>
-    <p><strong>Click</strong> a Lurch on the grid to inspect it — see its genome, stats, parents, children, and last action in the side panel.</p>
-    <p>In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it (smite, bless, place food, or build wall). Tool stays active until you press ESC.</p>
+    <p><strong>Click</strong> a Lurch to inspect it — genome, stats, parents, children, and last action. In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it.</p>
     <h3>Tips</h3>
-    <p>Start paused and click around to see the initial population. Press Space to run, then watch the event log and population sparkline. When things get boring — drop a meteor.</p>
+    <p>Start paused and click around to explore. Press Space to run, then watch the population sparkline and event log. When things get boring — drop a meteor.</p>
   `
 };
 
