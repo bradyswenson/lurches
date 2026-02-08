@@ -28,7 +28,8 @@
     min-height: 36px;
     flex-shrink: 0;
   }
-  #topbar .title { color: #e0e0f0; font-size: 16px; font-weight: bold; letter-spacing: 2px; }
+  #topbar .title { color: #e0e0f0; font-size: 16px; font-weight: bold; letter-spacing: 2px; transition: color 0.15s; }
+  #topbar .title:hover { color: #aaaaff; }
   #topbar .stats { display: flex; gap: 18px; color: #8888aa; font-size: 12px; }
   #topbar .stats span { color: #ccccdd; }
   #topbar .controls { display: flex; gap: 8px; align-items: center; }
@@ -248,8 +249,11 @@
   }
   .setup-header .subtitle {
     color: #555577;
-    font-size: 12px;
+    font-size: 15px;
     font-style: italic;
+    max-width: 320px;
+    margin: 0 auto;
+    line-height: 1.4;
   }
   .setup-header .ascii-art {
     color: #333355;
@@ -495,7 +499,7 @@
 <!-- GAME UI                                -->
 <!-- ═══════════════════════════════════════ -->
 <div id="topbar">
-  <div class="title">LURCHES</div>
+  <div class="title" id="title-btn" style="cursor:pointer;" title="Back to home">LURCHES</div>
   <div class="stats">
     Round: <span id="round-num">0</span> &nbsp;│&nbsp;
     Pop: <span id="pop-num">0</span> &nbsp;│&nbsp;
@@ -3375,6 +3379,13 @@ document.getElementById('start-btn').addEventListener('click', () => {
   // Init input & help
   initInput();
   initHelp();
+
+  // Title click → back to home
+  document.getElementById('title-btn').addEventListener('click', () => {
+    if (confirm('Return to home screen? Current simulation will be lost.')) {
+      location.reload();
+    }
+  });
 
   // Hide setup, show game
   document.getElementById('setup-screen').style.display = 'none';
