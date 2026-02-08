@@ -156,6 +156,7 @@
   .log-entry.combat { color: #cc8844; }
   .log-entry.event { color: #cccc44; }
   .log-entry.god { color: #cc44cc; }
+  .log-entry.discovery { color: #44ccaa; }
 
   #hotkeys {
     padding: 4px 12px;
@@ -471,6 +472,12 @@
           <input type="number" id="mutation-rate" value="0.05" min="0.01" max="0.2" step="0.01">
         </div>
       </div>
+      <div class="setup-row">
+        <div class="setup-field" style="flex:1;">
+          <label>Birth Rate: <span id="birth-rate-val">0.4x</span></label>
+          <input type="range" id="birth-rate" value="0.4" min="0.1" max="2.0" step="0.1" style="width:100%;">
+        </div>
+      </div>
     </div>
 
     <div class="setup-group">
@@ -555,6 +562,7 @@
         <button class="gm-btn" data-tool="bless"><kbd>V</kbd> Bless ✨</button>
       </div>
       <div class="gm-row">
+        <button class="gm-btn" data-tool="spawn"><kbd>S</kbd> Spawn Lurch</button>
         <button class="gm-btn" data-tool="food"><kbd>P</kbd> Place Food</button>
         <button class="gm-btn" data-tool="wall"><kbd>W</kbd> Build Wall</button>
       </div>
@@ -681,6 +689,8 @@ const TERRAIN = {
   SHALLOWS:    { id: 6, char: '≈', name: 'Shallows',   foodRegen: 2, moveCost: 2, safety: 3, visibility: 5, color: '#4a99aa', bgColor: '#0e1a20' },
   RUINS:       { id: 7, char: '♠', name: 'Ruins',      foodRegen: 1, moveCost: 1, safety: 2, visibility: 2, color: '#7a5a8a', bgColor: '#14101a' },
   WALL:        { id: 8, char: '█', name: 'Wall',       foodRegen: 0, moveCost: 99, safety: 10, visibility: 0, color: '#555555', bgColor: '#222222', impassable: true },
+  FERTILE_PLAINS: { id: 9,  char: '∞', name: 'Fertile Plains', foodRegen: 5, moveCost: 1, safety: 3, visibility: 5, color: '#ccaa33', bgColor: '#2a2210', enhanced: true },
+  LUSH_FOREST:   { id: 10, char: '♣', name: 'Lush Forest',   foodRegen: 6, moveCost: 2, safety: 5, visibility: 2, color: '#22cc44', bgColor: '#0a2a0e', enhanced: true, shelter: true },
 };
 const TERRAIN_BY_ID = Object.values(TERRAIN);
 const TERRAIN_IDS = Object.keys(TERRAIN);
@@ -709,6 +719,7 @@ const CONFIG = {
   gridH: 40,
   population: 40,
   mutationRate: 0.05,
+  birthRate: 0.4,
   macroMutationChance: 0.02,
   foodCap: 10,
   baseFoodStart: 5,
@@ -813,8 +824,9 @@ class World {
   regenFood(foodMultiplier = 1) {
     for (let i = 0; i < this.w * this.h; i++) {
       const t = this.terrain[i];
-      if (this.food[i] < CONFIG.foodCap) {
-        this.food[i] = Math.min(CONFIG.foodCap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier);
+      const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap; // enhanced terrain holds more food
+      if (this.food[i] < cap) {
+        this.food[i] = Math.min(cap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier);
       }
     }
   }
@@ -1527,6 +1539,7 @@ const Events = {
   },
 
   wildfire(world, sim) {
+    // Find ignition point in forest
     let sx, sy, attempts = 0;
     do {
       sx = world.rng.nextInt(world.w);
@@ -1534,48 +1547,75 @@ const Events = {
       attempts++;
     } while (world.getTerrain(sx, sy) !== TERRAIN.FOREST && attempts < 200);
 
-    const maxBurn = this.sevInt(80);
-    const spreadChance = 0.3 + this._severity * 0.05;
-    const burned = [];
-    const queue = [[sx, sy]];
-    const visited = new Set();
-    while (queue.length > 0 && burned.length < maxBurn) {
-      const [x, y] = queue.shift();
+    // Spreading wildfire — burns outward over many rounds
+    const sev = this._severity;
+    const spreadRate = 0.15 + sev * 0.06;   // sev1=0.21, sev5=0.45, sev10=0.75
+    const maxBurn = Math.round(30 + sev * sev * 2.5); // sev1=33, sev5=93, sev10=280
+    const dur = Math.round(10 + sev * 4);   // sev1=14, sev5=30, sev10=50 rounds
+    const killChance = 0.15 + sev * 0.08;   // sev1=0.23, sev10=0.95
+    const dmg = this.sevInt(40);
+    const self = this;
+
+    // Initial ignition: burn just the start cell
+    const burnedSet = new Set();
+    const frontier = []; // cells currently on fire (spreading edge)
+    function igniteCell(x, y) {
       const key = `${x},${y}`;
-      if (visited.has(key)) continue;
-      visited.add(key);
-      if (world.getTerrain(x, y) === TERRAIN.FOREST) {
-        world.setTerrain(x, y, TERRAIN.PLAINS);
-        world.setFood(x, y, 0);
-        burned.push([x, y]);
-        const l = world.getLurch(x, y);
-        if (l && l.alive) {
-          const killChance = 0.15 + this._severity * 0.08; // sev1=0.23, sev5=0.55, sev10=0.95
-          if (world.rng.next() < killChance) {
-            l.hp = 0; l.causeOfDeath = 'wildfire';
-          } else {
-            l.hp -= this.sevInt(40);
+      if (burnedSet.has(key)) return;
+      const t = world.getTerrain(x, y);
+      // Fire can burn forest, plains, swamp, and enhanced terrain
+      const burnable = [TERRAIN.FOREST, TERRAIN.PLAINS, TERRAIN.SWAMP, TERRAIN.LUSH_FOREST, TERRAIN.FERTILE_PLAINS];
+      if (!burnable.includes(t)) return;
+      burnedSet.add(key);
+      frontier.push([x, y]);
+      // Burn terrain — enhanced terrain reverts to base Plains
+      world.setTerrain(x, y, TERRAIN.PLAINS);
+      world.setFood(x, y, 0);
+      // Kill/hurt lurches
+      const l = world.getLurch(x, y);
+      if (l && l.alive) {
+        if (world.rng.next() < killChance) {
+          l.hp = 0; l.causeOfDeath = 'wildfire';
+        } else {
+          l.hp -= dmg;
+        }
+      }
+      // VFX: active fire
+      self.addVfx('fire', x, y, 25 + Math.floor(Math.random() * 15), { zone: 'perimeter' });
+      self.addVfx('ash', x, y, 60 + dur * 2 + Math.floor(Math.random() * 30));
+    }
+
+    igniteCell(sx, sy);
+
+    // Ongoing spreading fire — each tick the frontier expands
+    this.add({
+      name: 'Wildfire', duration: dur, vfxType: 'wildfire',
+      tick(w) {
+        if (burnedSet.size >= maxBurn || frontier.length === 0) return;
+        // Process current frontier — cells on fire try to spread
+        const currentFrontier = frontier.splice(0, frontier.length);
+        for (const [fx, fy] of currentFrontier) {
+          for (const [nx, ny] of w.neighbors8(fx, fy)) {
+            if (burnedSet.size >= maxBurn) return;
+            const nKey = `${nx},${ny}`;
+            if (burnedSet.has(nKey)) continue;
+            const nt = w.getTerrain(nx, ny);
+            // Forest spreads easily, plains/swamp can catch at higher severity
+            let chance = spreadRate;
+            if (nt === TERRAIN.LUSH_FOREST) chance *= 1.8; // lush burns hot
+            else if (nt === TERRAIN.FOREST) chance *= 1.5;
+            else if (nt === TERRAIN.FERTILE_PLAINS) chance *= 0.5; // cultivated land, less brush
+            else if (nt === TERRAIN.SWAMP) chance *= 0.6;
+            else if (nt === TERRAIN.PLAINS) chance *= 0.3;
+            else continue; // can't burn water, mountain, wall, etc.
+            if (w.rng.next() < chance) {
+              igniteCell(nx, ny);
+            }
           }
         }
-        for (const [nx, ny] of world.neighbors8(x, y)) {
-          if (world.rng.next() < spreadChance) queue.push([nx, ny]);
-        }
       }
-    }
-    // VFX: fire with perimeter/inner/wake zones
-    const burnedSet = new Set(burned.map(([x, y]) => `${x},${y}`));
-    for (const [bx, by] of burned) {
-      // Check if this cell is on the perimeter (has a non-burned neighbor)
-      let isPerimeter = false;
-      for (const [nx, ny] of world.neighbors8(bx, by)) {
-        if (!burnedSet.has(`${nx},${ny}`)) { isPerimeter = true; break; }
-      }
-      // Active fire: perimeter burns bright, inner smolders
-      this.addVfx('fire', bx, by, 30 + Math.floor(Math.random() * 20), { zone: isPerimeter ? 'perimeter' : 'inner' });
-      // Ash/wake: long-lasting dark char on all burned cells
-      this.addVfx('ash', bx, by, 80 + Math.floor(Math.random() * 40));
-    }
-    sim.log(`WILDFIRE [${this._severity}] — ${burned.length} forest cells burned`, 'event');
+    });
+    sim.log(`WILDFIRE [${sev}] — Ignited at (${sx},${sy}), spreading...`, 'event');
   },
 
   earthquake(world, sim) {
@@ -1911,12 +1951,27 @@ class Simulation {
     Events.tick(world, this);
     world.regenFood(Events.foodMultiplier);
 
-    // --- Decision Phase ---
-    const decisions = [];
+    // --- Teaching Phase ---
     const alive = world.lurches.filter(l => l.alive);
     for (const lurch of alive) {
       lurch.warned = false; // Reset warnings
+      lurch.taught = 0;    // Reset teaching bonus
     }
+    // High-INT lurches boost neighbors
+    for (const lurch of alive) {
+      if (lurch.genome.intelligence > 0.5) {
+        const teachPower = (lurch.genome.intelligence - 0.5) * 2; // 0→0 at 0.5, 1→1.0 at 1.0
+        for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+          const other = world.getLurch(nx, ny);
+          if (other && other.alive && other !== lurch) {
+            other.taught = Math.max(other.taught, teachPower); // take best teacher, don't stack
+          }
+        }
+      }
+    }
+
+    // --- Decision Phase ---
+    const decisions = [];
 
     // First pass: kin warnings from brilliant lurches
     for (const lurch of alive) {
@@ -2007,9 +2062,11 @@ class Simulation {
       const food = world.getFood(lurch.x, lurch.y);
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
-      const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3);
+      // Teaching bonus: taught lurches extract more nutrition from food
+      const teachBonus = 1 + lurch.taught * 0.3; // up to +30% efficiency
+      const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
       lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
-      lurch.energy = Math.min(100, lurch.energy + eatAmount * 2);
+      lurch.energy = Math.min(100, lurch.energy + eatAmount * 2 * teachBonus);
       lurch.lastAction = 'eat';
       lurch.hidden = false;
       lurch.sleeping = false;
@@ -2030,7 +2087,7 @@ class Simulation {
 
       // Success chance: diminishing returns on fertility (pow 1.4 curve)
       const rawFert = (lurch.genome.fertility + mate.genome.fertility) / 2;
-      let fertChance = Math.pow(rawFert, 1.4); // 0.5→0.38, 0.7→0.61, 0.9→0.86
+      let fertChance = Math.pow(rawFert, 1.4) * CONFIG.birthRate; // global birth rate multiplier
 
       // Local density penalty: crowded areas breed less
       let neighbors = 0;
@@ -2101,6 +2158,61 @@ class Simulation {
       }
     }
 
+    // --- Discovery Phase (INT + team → terrain upgrades) ---
+    if (this.round % 3 === 0) { // check every 3 rounds to save perf
+      for (const lurch of alive) {
+        if (!lurch.alive || lurch.juvenile) continue;
+        if (lurch.genome.intelligence < 0.4) continue;
+        if (lurch.hunger > 60 || lurch.energy < 20) continue; // hungry/tired lurches don't innovate
+
+        // Scan neighbors for team skills
+        let bestSTR = 0, bestSIZ = 0, bestPCP = 0;
+        for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+          const other = world.getLurch(nx, ny);
+          if (other && other.alive) {
+            bestSTR = Math.max(bestSTR, other.genome.strength);
+            bestSIZ = Math.max(bestSIZ, other.genome.size);
+            bestPCP = Math.max(bestPCP, other.genome.perception);
+          }
+        }
+
+        // Need minimum team: at least some STR, SIZE, and PCP nearby
+        if (bestSTR < 0.3 || bestSIZ < 0.3 || bestPCP < 0.3) continue;
+
+        // Discovery chance = INT * average team skill * base rate
+        const teamScore = (bestSTR + bestSIZ + bestPCP) / 3;
+        const discoveryChance = lurch.genome.intelligence * teamScore * 0.012;
+        if (rng.next() > discoveryChance) continue;
+
+        // Terrain upgrade paths
+        const t = world.getTerrain(lurch.x, lurch.y);
+        let upgrade = null;
+        if (t === TERRAIN.DESERT || t === TERRAIN.RUINS || t === TERRAIN.SWAMP) {
+          // Decide plains or forest based on surroundings
+          let forestCount = 0, plainsCount = 0;
+          for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+            const nt = world.getTerrain(nx, ny);
+            if (nt === TERRAIN.FOREST || nt === TERRAIN.LUSH_FOREST) forestCount++;
+            if (nt === TERRAIN.PLAINS || nt === TERRAIN.FERTILE_PLAINS) plainsCount++;
+          }
+          upgrade = forestCount > plainsCount ? TERRAIN.FOREST : TERRAIN.PLAINS;
+        } else if (t === TERRAIN.PLAINS) {
+          upgrade = TERRAIN.FERTILE_PLAINS;
+        } else if (t === TERRAIN.FOREST) {
+          upgrade = TERRAIN.LUSH_FOREST;
+        }
+
+        if (upgrade) {
+          world.setTerrain(lurch.x, lurch.y, upgrade);
+          Events.addVfx('sparkle', lurch.x, lurch.y, 20);
+          // Discovery costs energy — this is work
+          lurch.energy = Math.max(0, lurch.energy - 15);
+          lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 10);
+          this.log(`💡 #${lurch.id} discovered ${upgrade.name} at (${lurch.x},${lurch.y})`, 'discovery');
+        }
+      }
+    }
+
     // --- Status Update ---
     for (const lurch of world.lurches) {
       if (!lurch.alive) continue;
@@ -2143,8 +2255,14 @@ class Simulation {
         if (lurch.diseaseTurns <= 0) lurch.diseased = false;
       }
 
-      // Terrain hazards
+      // Terrain bonuses
       const terrain = world.getTerrain(lurch.x, lurch.y);
+      if (terrain.shelter) {
+        // Lush Forest: shelter provides HP regen and stress relief
+        lurch.hp = Math.min(lurch.maxHP, lurch.hp + lurch.maxHP * 0.03);
+        lurch.stress = Math.max(0, lurch.stress - 3);
+      }
+      // Terrain hazards
       if (terrain.drowning && lurch.genome.adaptability < 0.5 && !lurch.hidden) {
         if (rng.next() < CONFIG.drownChance * (1 - lurch.genome.adaptability)) {
           lurch.hp -= 20;
@@ -2346,6 +2464,13 @@ class Renderer {
             alpha *= (0.5 + blinkPhase * 0.25 + 0.25); // pulse between 0.5 and 1.0
           }
 
+          // Teaching glow — taught lurches get a subtle warm halo
+          if (lurch.taught > 0) {
+            const glowAlpha = lurch.taught * 0.2;
+            ctx.fillStyle = `rgba(255, 220, 100, ${glowAlpha})`;
+            ctx.fillRect(px, py, this.cellW, this.cellH);
+          }
+
           ctx.globalAlpha = alpha;
           ctx.fillStyle = color;
           ctx.fillText('@', px + halfCellW, py + halfCellH);
@@ -2420,6 +2545,14 @@ class Renderer {
         const g = life > 0.7 ? Math.floor(255 * (1 - (life - 0.7) * 3)) : Math.floor(100 * life);
         ctx.fillStyle = `rgba(${r}, ${g}, 0, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
+      } else if (vfx.type === 'sparkle') {
+        const shimmer = Math.sin(now / 40 + vfx.x * 3 + vfx.y * 5) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(100, 255, 140, ${life * 0.5 * (0.4 + shimmer * 0.6)})`;
+        ctx.fillRect(px, py, this.cellW, this.cellH);
+        ctx.globalAlpha = life * 0.8;
+        ctx.fillStyle = '#88ffaa';
+        ctx.fillText('*', px + halfCellW, py + halfCellH);
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -2631,6 +2764,15 @@ const ui = {
     html += `<div class="stat-row"><span class="stat-label">Terrain</span><span class="stat-value">${world.getTerrain(lurch.x, lurch.y).name}</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Position</span><span class="stat-value">(${lurch.x}, ${lurch.y})</span></div>`;
 
+    // Intelligence roles
+    const roles = [];
+    if (lurch.genome.intelligence > 0.5) roles.push('🧠 Teacher');
+    if (lurch.taught > 0) roles.push('📖 Learning');
+    if (lurch.genome.intelligence > 0.4 && lurch.genome.strength > 0.3) roles.push('💡 Discoverer');
+    if (roles.length > 0) {
+      html += `<div class="stat-row" style="margin-top:4px;"><span class="stat-label">Roles</span><span class="stat-value">${roles.join(' ')}</span></div>`;
+    }
+
     this.inspectorEl.innerHTML = html;
   },
 
@@ -2653,7 +2795,7 @@ const ui = {
     const el = document.getElementById('god-tool-status');
     const canvas = document.getElementById('grid-canvas');
     if (sim.godTool) {
-      const labels = { smite: '⚡ SMITE — click or drag', bless: '✨ BLESS — click or drag', food: '🍎 PLACE FOOD — click or drag', wall: '🧱 BUILD WALL — click or drag' };
+      const labels = { smite: '⚡ SMITE — click or drag', bless: '✨ BLESS — click or drag', spawn: '🌱 SPAWN — click or drag', food: '🍎 PLACE FOOD — click or drag', wall: '🧱 BUILD WALL — click or drag' };
       el.textContent = (labels[sim.godTool] || sim.godTool) + '  (ESC to cancel)';
       el.style.display = 'block';
       canvas.style.cursor = 'crosshair';
@@ -2730,6 +2872,7 @@ function initInput() {
     const godTools = {
       'l': 'smite', 'L': 'smite',
       'v': 'bless', 'V': 'bless',
+      's': 'spawn', 'S': 'spawn',
       'p': 'food', 'P': 'food',
       'w': 'wall', 'W': 'wall',
     };
@@ -2783,8 +2926,26 @@ function initInput() {
           sim.totalDeaths++;
         }
         break;
+      case 'spawn': {
+        // Don't spawn on top of existing lurch or impassable terrain
+        const existing = world.getLurch(gx, gy);
+        const terrain = world.getTerrain(gx, gy);
+        if (!existing && !terrain.impassable) {
+          const presetData = LURCH_PRESETS[sim.lurchPreset] || LURCH_PRESETS.balanced;
+          const genome = Genetics.createGenome(presetData.means, presetData.variance, world.rng);
+          const id = nextLurchId++;
+          const newLurch = new Lurch(id, gx, gy, genome);
+          newLurch.birthRound = sim.round;
+          newLurch.juvenile = false;
+          newLurch.age = world.rng.nextInt(10);
+          world.lurches.push(newLurch);
+          world.placeLurch(newLurch);
+        }
+        break;
+      }
     }
-    Events.addVfx('explosion', gx, gy, 12);
+    const vfxType = sim.godTool === 'spawn' ? 'sparkle' : 'explosion';
+    Events.addVfx(vfxType, gx, gy, 15);
   }
 
   // Click and drag on grid
@@ -2826,7 +2987,7 @@ function initInput() {
     if (!godDragging) return;
     godDragging = false;
     // Log a summary of what happened
-    const toolLabels = { smite: '⚡ SMITE', bless: '✨ BLESS', food: '🍎 FOOD', wall: '🧱 WALL' };
+    const toolLabels = { smite: '⚡ SMITE', bless: '✨ BLESS', spawn: '🌱 SPAWN', food: '🍎 FOOD', wall: '🧱 WALL' };
     const label = toolLabels[sim.godTool] || sim.godTool;
     if (godDragCount === 1) {
       const rect = canvas.getBoundingClientRect();
@@ -2904,11 +3065,17 @@ function initInput() {
 // ============================================================
 // SETUP & START
 // ============================================================
+// Birth rate slider display
+const brSlider = document.getElementById('birth-rate');
+const brVal = document.getElementById('birth-rate-val');
+brSlider.addEventListener('input', () => { brVal.textContent = parseFloat(brSlider.value).toFixed(1) + 'x'; });
+
 document.getElementById('start-btn').addEventListener('click', () => {
   const gridW = parseInt(document.getElementById('grid-w').value) || 80;
   const gridH = parseInt(document.getElementById('grid-h').value) || 40;
   const popCount = parseInt(document.getElementById('pop-count').value) || 40;
   const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
+  const birthRate = parseFloat(document.getElementById('birth-rate').value) || 0.4;
   const seedStr = document.getElementById('rng-seed').value.trim();
   const mapPreset = document.getElementById('map-preset').value;
   const lurchPreset = document.getElementById('lurch-preset').value;
@@ -2917,6 +3084,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   CONFIG.gridH = gridH;
   CONFIG.population = popCount;
   CONFIG.mutationRate = mutRate;
+  CONFIG.birthRate = birthRate;
 
   const seed = seedStr ? parseInt(seedStr) || hashString(seedStr) : Math.floor(Math.random() * 2147483647);
   const rng = new SeededRNG(seed);
@@ -2927,6 +3095,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
   // Init simulation
   sim = new Simulation(world);
+  sim.lurchPreset = lurchPreset;
   sim.seedPopulation(lurchPreset, popCount);
 
   // Init renderer
@@ -3038,6 +3207,10 @@ const HELP_CONTENT = {
     <p>High stress degrades effective Intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and adjacent threats. It drops from eating, sleeping, safe terrain, and solitude.</p>
     <h3>Kin Warning</h3>
     <p>Smart Lurches (INT ≥ 0.6) can warn nearby relatives (>70% genetic similarity) of danger. Warned Lurches are more likely to flee or hide. This creates emergent kin selection — family groups survive better, but also compete for food.</p>
+    <h3>Teaching</h3>
+    <p>Lurches with INT above 0.5 automatically teach nearby neighbors, boosting their food gathering efficiency by up to 30%. Taught Lurches glow with a warm golden halo. The smarter the teacher, the bigger the bonus — but it only works for adjacent Lurches.</p>
+    <h3>Discovery</h3>
+    <p>When a high-INT Lurch is surrounded by a team with Strength, Size, and Perception, they can upgrade terrain: Desert becomes Plains or Forest, Plains becomes <span style="color:#ccaa33">Fertile Plains</span>, and Forest becomes <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain produces more food and has a higher food cap. <span style="color:#ccaa33">Fertile Plains</span> are rich farmland. <span style="color:#22cc44">Lush Forest</span> provides shelter (HP regen and stress relief). Discovery costs energy — hungry Lurches don't innovate. Disasters reset enhanced terrain back to base types.</p>
   `,
   godmode: `
     <h3>God Mode</h3>
@@ -3064,7 +3237,7 @@ const HELP_CONTENT = {
     </table>
     <h3>Direct Tools</h3>
     <p>Select a tool, then click the grid to apply it:</p>
-    <p><code>L</code> <strong>Smite</strong> — kill a Lurch instantly. <code>V</code> <strong>Bless</strong> — fully heal a Lurch. <code>P</code> <strong>Place Food</strong> — max food on a cell. <code>W</code> <strong>Build Wall</strong> — impassable terrain.</p>
+    <p><code>L</code> <strong>Smite</strong> — kill a Lurch instantly. <code>V</code> <strong>Bless</strong> — fully heal a Lurch. <code>S</code> <strong>Spawn</strong> — create a new Lurch. <code>P</code> <strong>Place Food</strong> — max food on a cell. <code>W</code> <strong>Build Wall</strong> — impassable terrain. All tools support click-and-drag.</p>
   `,
   controls: `
     <h3>Keyboard Controls</h3>
