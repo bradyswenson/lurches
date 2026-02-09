@@ -2893,9 +2893,10 @@ class Simulation {
         reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
       }
 
-      // Low-population recovery: burst then decay
-      if (this._recoveryEnergy > 0.001 || this._emergencyEnergy > 0.001) {
-        reproChance *= 1 + this._recoveryEnergy + this._emergencyEnergy;
+      // Low-population recovery: burst then decay (emergency replaces, doesn't stack)
+      const recoveryBurst = Math.max(this._recoveryEnergy, this._emergencyEnergy);
+      if (recoveryBurst > 0.001) {
+        reproChance *= 1 + recoveryBurst;
       }
 
       // Event-based fertility boost (e.g., Fertile Season)
