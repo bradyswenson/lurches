@@ -608,7 +608,7 @@
         <button class="gm-btn" data-event="mutationburst"><kbd>8</kbd> Mutation Burst</button>
       </div>
       <div class="gm-row">
-        <button class="gm-btn" data-event="bottleneck"><kbd>B</kbd> Cull (kill 50%)</button>
+        <button class="gm-btn" data-event="bottleneck"><kbd>C</kbd> Cull (kill 50%)</button>
         <button class="gm-btn" data-event="rejuvenation"><kbd>R</kbd> Rejuvenation</button>
       </div>
       <div class="gm-divider"></div>
@@ -2881,9 +2881,9 @@ class Simulation {
       // Low-population recovery: less competition = easier breeding
       // Steeper curve at very low pop: gradual boost to 150, strong boost under 75, emergency under 30
       if (popSize < 150) {
-        let recoveryBoost = (150 - popSize) / 150 * 0.45; // base: up to +45%
-        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.45; // +45% more under 75
-        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.45; // +45% more under 30 (emergency)
+        let recoveryBoost = (150 - popSize) / 150 * 0.35; // base: up to +35%
+        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.35; // +35% more under 75
+        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.35; // +35% more under 30 (emergency)
         reproChance *= 1 + recoveryBoost;
       }
 
@@ -3811,7 +3811,7 @@ function initInput() {
       '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
       '5': 'iceage', '6': 'meteor', '9': 'fertile',
       '7': 'plague', '8': 'mutationburst',
-      'b': 'bottleneck', 'B': 'bottleneck',
+      'c': 'bottleneck', 'C': 'bottleneck',
       'r': 'rejuvenation', 'R': 'rejuvenation',
     };
     const godTools = {
@@ -3969,7 +3969,8 @@ function initInput() {
     if (Events[eventName]) {
       Events[eventName](world, sim);
       // Log to timeline
-      const name = eventName.charAt(0).toUpperCase() + eventName.slice(1);
+      const displayNames = { bottleneck:'Cull', iceage:'Ice Age', mutationburst:'Mutation Burst' };
+      const name = displayNames[eventName] || eventName.charAt(0).toUpperCase() + eventName.slice(1);
       const icons = { drought:'🌵', flood:'🌊', wildfire:'🔥', earthquake:'🌋', meteor:'☄️', iceage:'❄️', fertile:'🌱', plague:'🦠', mutationburst:'🧪', bottleneck:'⚡', rejuvenation:'✨' };
       sim.addTimeline(icons[eventName] || '⚡', `${name} [${Events._severity}]`, 'godmode');
       renderer.render();
@@ -4239,7 +4240,7 @@ const HELP_CONTENT = {
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
       <tr><td><code>7</code></td><td>Plague</td><td>Disease spreads from patient zero</td></tr>
       <tr><td><code>8</code></td><td>Mutation Burst</td><td>Mutation rate, variance, and macro-mutation chance all spike — disrupts dominant traits with wild offspring</td></tr>
-      <tr><td><code>B</code></td><td>Cull</td><td>Kill 50% randomly</td></tr>
+      <tr><td><code>C</code></td><td>Cull</td><td>Kill 50% randomly</td></tr>
       <tr><td><code>R</code></td><td>Rejuvenation</td><td>Heal and refresh all Lurches</td></tr>
     </table>
     <h3>Direct Tools</h3>
