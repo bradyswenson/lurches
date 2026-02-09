@@ -899,17 +899,30 @@ function generateMap(world, preset, rng) {
   // Presets
   const presets = {
     random() {
+      // First pass: collect noise values
+      const values = new Float32Array(w * h);
+      let minV = Infinity, maxV = -Infinity;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const v = multiNoise(x, y);
+          values[y * w + x] = v;
+          if (v < minV) minV = v;
+          if (v > maxV) maxV = v;
+        }
+      }
+      // Normalize to 0-1 so terrain distribution is consistent across all seeds
+      const range = maxV - minV || 1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const v = (values[y * w + x] - minV) / range;
           let t;
-          if (v < 0.15) t = TERRAIN.DEEP_WATER;
-          else if (v < 0.25) t = TERRAIN.SHALLOWS;
-          else if (v < 0.42) t = TERRAIN.PLAINS;
+          if (v < 0.12) t = TERRAIN.DEEP_WATER;
+          else if (v < 0.20) t = TERRAIN.SHALLOWS;
+          else if (v < 0.40) t = TERRAIN.PLAINS;
           else if (v < 0.62) t = TERRAIN.FOREST;
           else if (v < 0.72) t = TERRAIN.SWAMP;
-          else if (v < 0.82) t = TERRAIN.MOUNTAIN;
-          else if (v < 0.9) t = TERRAIN.DESERT;
+          else if (v < 0.80) t = TERRAIN.MOUNTAIN;
+          else if (v < 0.90) t = TERRAIN.DESERT;
           else t = TERRAIN.RUINS;
           world.setTerrain(x, y, t);
         }
