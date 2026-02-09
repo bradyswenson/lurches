@@ -2535,7 +2535,7 @@ class Simulation {
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
       // Smart foraging: small personal INT bonus + teaching community bonus
-      const smartForage = lurch.effectiveInt * 0.1; // up to +10% from INT alone
+      const smartForage = lurch.effectiveInt * 0.15; // up to +15% from INT alone
       const quickHands = lurch.genome.speed * 0.1; // up to +10% from SPD (fast foragers)
       const teachBonus = 1 + smartForage + quickHands + lurch.taught * 0.3; // teaching adds up to +30%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
@@ -2748,6 +2748,7 @@ class Simulation {
       // Hunger — VIT efficiency: healthy bodies burn calories slower
       const metabolism = 1 + lurch.genome.vitality * 0.3 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.adaptability * 0.6;
       const vitEfficiency = 1 - lurch.genome.vitality * 0.1; // up to 10% slower hunger from VIT
+      const intEfficiency = 1 - lurch.effectiveInt * 0.12; // up to 12% slower hunger — smart lurches are efficient
       // Group efficiency: lurches in clusters burn less energy (settled agriculture effect)
       // 2+ neighbors = 10% slower hunger, 4+ = 20% (cap). Models reduced need to forage/travel.
       let groupNeighbors = 0;
@@ -2756,7 +2757,7 @@ class Simulation {
         if (n && n.alive) groupNeighbors++;
       }
       const groupEfficiency = groupNeighbors >= 2 ? 1 - Math.min(groupNeighbors * 0.05, 0.2) : 1;
-      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5 * vitEfficiency * groupEfficiency);
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5 * vitEfficiency * intEfficiency * groupEfficiency);
 
       // Energy passive drain
       if (!lurch.sleeping) {
@@ -3867,7 +3868,7 @@ const HELP_CONTENT = {
       <tr><td style="color:#44ff44">Vitality</td><td>Disease resistance, passive healing, cold tolerance, efficient metabolism</td><td>Metabolism cost</td></tr>
       <tr><td style="color:#44ffff">Speed</td><td>Movement speed, flee success, fast foraging</td><td>Burns energy faster</td></tr>
       <tr><td style="color:#ff4444">Strength</td><td>Attack damage, fight initiation, counter-strikes</td><td>Higher food needs</td></tr>
-      <tr><td style="color:#4488ff">Intelligence</td><td>Decision quality, teaching, discovery, evasion, smart foraging</td><td>No direct combat bonus</td></tr>
+      <tr><td style="color:#4488ff">Intelligence</td><td>Decision quality, teaching, discovery, evasion, smart foraging, efficient metabolism</td><td>No direct combat bonus</td></tr>
       <tr><td style="color:#ffff44">Adaptability</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
       <tr><td style="color:#cccccc">Perception</td><td>Scan range, threat detection, cooperation, evasion, migration pull</td><td>Stress from crowds</td></tr>
       <tr><td style="color:#ffffff">Size</td><td>Max HP, combat advantage, counter-strikes</td><td>Needs most food, easy to spot</td></tr>
