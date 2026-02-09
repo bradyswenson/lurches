@@ -2511,7 +2511,11 @@ class Simulation {
   checkMilestones(alive) {
     const pop = alive.length;
     if (pop === 0) {
-      if (this._peakPop > 0) this.addTimeline('💀', `EXTINCTION — all lurches dead (peak was ${this._peakPop})`, 'milestone');
+      if (this._peakPop > 0) {
+        this.addTimeline('💀', `EXTINCTION — all lurches dead (peak was ${this._peakPop})`, 'milestone');
+        this.log(`EXTINCTION on day ${this.round}. Peak population was ${this._peakPop}.`, 'event');
+        if (!this.paused) { this.togglePause(); ui.update(); }
+      }
       return;
     }
 
