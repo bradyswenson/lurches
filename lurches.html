@@ -2537,7 +2537,7 @@ class Simulation {
     for (const lurch of alive) {
       if (lurch.thinkTank <= 0) continue;
       const edifyRange = 2; // smaller radius — you have to be close
-      const edifyPower = lurch.thinkTank * 0.006; // tripled: ~0.0006 to ~0.0012 per tick
+      const edifyPower = lurch.thinkTank * 0.018; // tripled again: ~0.0018 to ~0.0036 per tick
       for (const cell of world.cellsInRadius(lurch.x, lurch.y, edifyRange)) {
         const other = world.getLurch(cell[0], cell[1]);
         if (other && other.alive && other !== lurch && other.genome.intelligence < 0.45) {
