@@ -2541,6 +2541,11 @@ class Simulation {
       for (const cell of world.cellsInRadius(lurch.x, lurch.y, edifyRange)) {
         const other = world.getLurch(cell[0], cell[1]);
         if (other && other.alive && other !== lurch && other.genome.intelligence < 0.45) {
+          // Only edify lurches already leaning INT — don't convert STR bruisers into bad intellectuals
+          const g = other.genome;
+          const intRank = [g.vitality, g.speed, g.strength, g.adaptability, g.perception, g.size]
+            .filter(v => v > g.intelligence).length;
+          if (intRank > 1) continue; // INT must be top or 2nd gene to be edifiable
           const oldInt = other.genome.intelligence;
           // Diminishing returns: harder to push higher
           const diminish = 1 - (oldInt / 0.45);
