@@ -1028,6 +1028,18 @@ function generateMap(world, preset, rng) {
 
   (presets[preset] || presets.random)();
 
+  // Scatter natural enhanced terrain patches (Lush Forest in forests, Fertile Plains in plains)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const t = world.terrain[world.idx(x, y)];
+      if (t === TERRAIN.FOREST && rng.next() < 0.04) {
+        world.setTerrain(x, y, TERRAIN.LUSH_FOREST);
+      } else if (t === TERRAIN.PLAINS && rng.next() < 0.03) {
+        world.setTerrain(x, y, TERRAIN.FERTILE_PLAINS);
+      }
+    }
+  }
+
   // Initialize food
   for (let i = 0; i < w * h; i++) {
     world.food[i] = Math.min(CONFIG.foodCap, world.terrain[i].foodRegen * 1.5 + rng.next() * 2);
