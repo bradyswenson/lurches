@@ -2537,7 +2537,7 @@ class Simulation {
     for (const lurch of alive) {
       if (lurch.thinkTank <= 0) continue;
       const edifyRange = 2; // smaller radius — you have to be close
-      const edifyPower = lurch.thinkTank * 0.002; // very subtle: ~0.0002 to ~0.0004 per tick
+      const edifyPower = lurch.thinkTank * 0.006; // moderate: ~0.0006 to ~0.0012 per tick
       for (const cell of world.cellsInRadius(lurch.x, lurch.y, edifyRange)) {
         const other = world.getLurch(cell[0], cell[1]);
         if (other && other.alive && other !== lurch && other.genome.intelligence < 0.45) {
@@ -2866,19 +2866,19 @@ class Simulation {
       }
 
       // Local density penalty: crowded areas breed less (cooperators + academies partially exempt)
-      if (reproNeighbors >= 4) {
-        const crowdPenalty = (reproNeighbors - 3) * 0.12;
-        let coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
-        if (lurch.thinkTank > 0) coopExempt = Math.min(0.85, coopExempt + 0.35); // academies strongly resist crowding penalty
-        reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
+      if (reproNeighbors >= 5) {
+        const crowdPenalty = (reproNeighbors - 4) * 0.08; // softer: starts at 5 (was 4), 0.08 (was 0.12)
+        let coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0;
+        if (lurch.thinkTank > 0) coopExempt = Math.min(0.85, coopExempt + 0.35);
+        reproChance *= Math.max(0.15, 1 - crowdPenalty * (1 - coopExempt));
       }
 
-      // Low-population recovery: less competition = easier breeding
-      // Steeper curve at very low pop: gradual boost to 150, strong boost under 75, emergency under 30
-      if (popSize < 150) {
-        let recoveryBoost = (150 - popSize) / 150 * 0.5; // base: up to +50%
-        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.5; // +50% more under 75
-        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.5; // +50% more under 30 (emergency)
+      // Population sustainability: gradual breeding boost as population declines
+      // Kicks in earlier (500) to prevent the R1200 death spiral
+      if (popSize < 500) {
+        let recoveryBoost = (500 - popSize) / 500 * 0.3; // gentle: up to +30% at 0 pop
+        if (popSize < 150) recoveryBoost += (150 - popSize) / 150 * 0.4; // +40% more under 150
+        if (popSize < 50) recoveryBoost += (50 - popSize) / 50 * 0.5; // +50% more under 50 (emergency)
         reproChance *= 1 + recoveryBoost;
       }
 
