@@ -1381,6 +1381,35 @@ const DecisionEngine = {
     return this.directionTo(world, lurch.x, lurch.y, c.x, c.y);
   },
 
+  // INT beacon: long-range scan specifically for other INT lurches
+  // Smart lurches can sense each other from much further than normal scan range
+  intBeacon(lurch, world) {
+    if (lurch.genome.intelligence < 0.3) return null;
+    const beaconRange = 6 + Math.round(lurch.genome.intelligence * 6); // 6-12 tiles
+    let closest = null;
+    let closestDist = Infinity;
+    let bestCluster = null;
+    let bestClusterScore = 0;
+    for (let dy = -beaconRange; dy <= beaconRange; dy++) {
+      for (let dx = -beaconRange; dx <= beaconRange; dx++) {
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > beaconRange || d < 2) continue;
+        const nx = world.wrapX(lurch.x + dx);
+        const ny = world.wrapY(lurch.y + dy);
+        const other = world.getLurch(nx, ny);
+        if (other && other.alive && other !== lurch && other.genome.intelligence >= 0.3) {
+          if (d < closestDist) { closest = { x: nx, y: ny, dist: d }; closestDist = d; }
+          // Score clusters: count INT neighbors around this target
+          let clusterScore = other.genome.intelligence;
+          if (other.thinkTank > 0) clusterScore += other.thinkTank * 3; // active academies are magnetic
+          if (clusterScore > bestClusterScore) { bestCluster = { x: nx, y: ny, dist: d }; bestClusterScore = clusterScore; }
+        }
+      }
+    }
+    // Prefer active academies over lone thinkers
+    return bestClusterScore > 0.5 ? bestCluster : closest;
+  },
+
   // Scan surroundings for food, threats, mates, teachers
   scan(lurch, world, range) {
     const foods = [];
@@ -1414,8 +1443,8 @@ const DecisionEngine = {
           if (d > 1 && !(other.genome.strength > lurch.genome.strength * 0.8)) {
             companions.push({ lurch: other, x: nx, y: ny, dist: d });
           }
-          // Track thinkers (INT >= 0.4 lurches for think tank seeking)
-          if (other.genome.intelligence >= 0.4 && d > 1) {
+          // Track thinkers (INT >= 0.3 lurches for think tank seeking)
+          if (other.genome.intelligence >= 0.3 && d > 1) {
             thinkers.push({ lurch: other, x: nx, y: ny, dist: d, int: other.genome.intelligence });
           }
         }
@@ -1505,6 +1534,13 @@ const DecisionEngine = {
       return { action: 'move', dir: [dx, dy] };
     }
 
+    // INT beacon: even instinctive INT lurches feel drawn toward each other
+    const beacon = this.intBeacon(lurch, world);
+    if (beacon) {
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, beacon.x, beacon.y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
     // Migration pull: drift toward population center when species is sparse
     const pull = this.migrationPull(lurch, world);
     if (pull) return { action: 'move', dir: pull };
@@ -1539,7 +1575,7 @@ const DecisionEngine = {
     }
 
     // Think tank seeking: INT lurches seek other thinkers (before food-chasing)
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+    if (lurch.genome.intelligence >= 0.3 && scan.thinkers.length > 0) {
       scan.thinkers.sort((a, b) => b.int - a.int);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.thinkers[0].x, scan.thinkers[0].y);
       return { action: 'move', dir: [dx, dy] };
@@ -1571,6 +1607,13 @@ const DecisionEngine = {
     if (lurch.hunger > 30 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // INT beacon: sense distant INT lurches and move toward them
+    const beacon = this.intBeacon(lurch, world);
+    if (beacon) {
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, beacon.x, beacon.y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1629,7 +1672,7 @@ const DecisionEngine = {
     }
 
     // Think tank seeking: strategic INT lurches actively seek thinker clusters
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+    if (lurch.genome.intelligence >= 0.3 && scan.thinkers.length > 0) {
       scan.thinkers.sort((a, b) => b.int - a.int);
       const best = scan.thinkers[0];
       if (best.dist <= 1) {
@@ -1683,6 +1726,13 @@ const DecisionEngine = {
     if (lurch.hunger > 25 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // INT beacon: sense distant INT lurches and move toward them
+    const beacon = this.intBeacon(lurch, world);
+    if (beacon) {
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, beacon.x, beacon.y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1762,7 +1812,7 @@ const DecisionEngine = {
     }
 
     // Think tank seeking: brilliant INT lurches prioritize thinker clusters
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+    if (lurch.genome.intelligence >= 0.3 && scan.thinkers.length > 0) {
       scan.thinkers.sort((a, b) => b.int - a.int);
       const best = scan.thinkers[0];
       if (best.dist <= 1) {
@@ -1844,6 +1894,13 @@ const DecisionEngine = {
     if (lurch.hunger > 20 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // INT beacon: sense distant INT lurches and move toward them
+    const beacon = this.intBeacon(lurch, world);
+    if (beacon) {
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, beacon.x, beacon.y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -2385,11 +2442,11 @@ class Simulation {
     }
     // Think tank: INT lurches near other INT lurches reinforce each other
     for (const lurch of alive) {
-      if (lurch.genome.intelligence < 0.4) continue;
+      if (lurch.genome.intelligence < 0.3) continue;
       let intNeighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         const other = world.getLurch(nx, ny);
-        if (other && other.alive && other.genome.intelligence >= 0.4) {
+        if (other && other.alive && other.genome.intelligence >= 0.3) {
           intNeighbors++;
         }
       }
@@ -2523,7 +2580,7 @@ class Simulation {
       lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 12); // combat burns calories
 
       // Evasion: smart lurches can dodge attacks entirely
-      const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~45% (INT+SPD+PER)
+      const evasionChance = target.effectiveInt * 0.35 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~55% (INT+SPD+PER)
       if (rng.next() < evasionChance) {
         target.stress = Math.min(100, target.stress + 5); // close call is stressful
         lurch.stress = Math.min(100, lurch.stress + 8); // wasted energy
@@ -2544,6 +2601,8 @@ class Simulation {
       const packBonus = 1 + packAllies * 0.2; // each brute ally adds 20% attack
       const attackPower = (lurch.genome.strength * 0.6 + lurch.genome.size * 0.4) * lurch.specPenalty * 30 * (0.5 + rng.next() * 0.5) * packBonus;
       let defensePower = (target.genome.size * 0.5 + target.genome.strength * 0.3 + target.genome.adaptability * 0.2) * 20 + world.getTerrain(target.x, target.y).safety * 3;
+      // Solo INT defense: smart lurches fight cleverly even alone (parry, misdirect, use terrain)
+      defensePower += target.effectiveInt * 10; // up to +10 defense from pure intelligence
       // Academy defense: INT lurches in think tanks devise defenses (traps, weapons, tactics)
       if (target.thinkTank > 0) {
         defensePower *= 1 + target.thinkTank * 5; // +0.25 to +0.75 defense (1-3 INT neighbors)
@@ -4003,7 +4062,7 @@ const HELP_CONTENT = {
     <h3>Stress</h3>
     <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>
     <h3>Think Tank</h3>
-    <p>INT Lurches (≥ 0.4) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, up to +0.15. This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
+    <p>INT Lurches (≥ 0.3) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, up to +0.15. This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. INT Lurches can sense each other from up to 12 tiles away and actively seek each other out to form academies. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
     <h3>Teaching</h3>
     <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In settlements, teaching is amplified — more cooperators nearby means stronger lessons.</p>
     <h3>Discovery</h3>
