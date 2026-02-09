@@ -1411,7 +1411,10 @@ const DecisionEngine = {
 
     // Aggression: dumb brutes pick fights with weaker neighbors
     // Low INT + high STR/SIZ = aggressive
-    const aggression = (lurch.genome.strength + lurch.genome.size) / 2 - (lurch.genome.intelligence + lurch.genome.perception) / 2;
+    let aggression = (lurch.genome.strength + lurch.genome.size) / 2 - (lurch.genome.intelligence + lurch.genome.perception) / 2;
+    // Low-population dampening: when everyone's scarce, even brutes hold back
+    const pop = world._popCount || 200;
+    if (pop < 100) aggression *= Math.max(0.3, pop / 100);
     if (aggression > 0.1 && lurch.energy > 20) {
       // Look for weaker adjacent lurches to bully
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
@@ -1448,7 +1451,7 @@ const DecisionEngine = {
     }
 
     // Seek companions when hungry (group up when resources are tight)
-    if (lurch.hunger > 40 && companions.length > 0) {
+    if (lurch.hunger > 30 && companions.length > 0) {
       companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, companions[0].x, companions[0].y);
       return { action: 'move', dir: [dx, dy] };
@@ -1499,7 +1502,7 @@ const DecisionEngine = {
     }
 
     // Seek companions when hungry (group up when resources are tight)
-    if (lurch.hunger > 40 && scan.companions.length > 0) {
+    if (lurch.hunger > 30 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
@@ -1583,7 +1586,7 @@ const DecisionEngine = {
     }
 
     // Seek companions when hungry (group up when resources are tight)
-    if (lurch.hunger > 35 && scan.companions.length > 0) {
+    if (lurch.hunger > 25 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
@@ -1713,7 +1716,7 @@ const DecisionEngine = {
     }
 
     // Seek companions when hungry (group up when resources are tight)
-    if (lurch.hunger > 30 && scan.companions.length > 0) {
+    if (lurch.hunger > 20 && scan.companions.length > 0) {
       scan.companions.sort((a, b) => a.dist - b.dist);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
@@ -2317,6 +2320,7 @@ class Simulation {
       }
     }
 
+    world._popCount = alive.length; // Cache for AI decisions
     for (const lurch of alive) {
       const decision = DecisionEngine.decide(lurch, world);
       // Kin warning bias: if warned, bias toward flee/hide
@@ -2515,8 +2519,12 @@ class Simulation {
       }
 
       // Low-population recovery: less competition = easier breeding
+      // Steeper curve at very low pop: gradual boost to 150, strong boost under 75, emergency under 30
       if (popSize < 150) {
-        reproChance *= 1 + (150 - popSize) / 150 * 0.5;
+        let recoveryBoost = (150 - popSize) / 150 * 0.5; // base: up to +50%
+        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.5; // +50% more under 75
+        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.5; // +50% more under 30 (emergency)
+        reproChance *= 1 + recoveryBoost;
       }
 
       // Event-based fertility boost (e.g., Fertile Season)
@@ -2554,7 +2562,9 @@ class Simulation {
       lurch.energy -= CONFIG.reproduceEnergyCost;
       mate.energy -= CONFIG.reproduceEnergyCost * 0.5;
       // Set reproduction cooldown: 4-6 rounds (healthy = shorter cooldown)
-      const cooldown = Math.round(6 - healthScore * 2);
+      let cooldown = Math.round(6 - healthScore * 2);
+      // Low-population urgency: breed faster when species is at risk
+      if (popSize < 100) cooldown = Math.max(2, Math.round(cooldown * (0.5 + popSize / 200)));
       lurch.reproCooldown = cooldown;
       mate.reproCooldown = Math.round(cooldown * 0.7);
       lurch.lastAction = `reproduce → #${child.id}`;
