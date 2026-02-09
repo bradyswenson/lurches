@@ -2219,7 +2219,7 @@ class Simulation {
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
 
       // Evasion: smart lurches can dodge attacks entirely
-      const evasionChance = target.effectiveInt * 0.35 + target.genome.speed * 0.15; // up to ~50%
+      const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1; // up to ~35%
       if (rng.next() < evasionChance) {
         target.stress = Math.min(100, target.stress + 5); // close call is stressful
         lurch.stress = Math.min(100, lurch.stress + 8); // wasted energy
@@ -2323,7 +2323,7 @@ class Simulation {
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
       // Smart foraging: INT lurches are inherently better at extracting nutrition
-      const smartForage = 1 + lurch.effectiveInt * 0.25; // up to +25% from INT alone
+      const smartForage = 1 + lurch.effectiveInt * 0.15; // up to +15% from INT alone
       // Teaching bonus: taught lurches extract even more nutrition from food
       const teachBonus = smartForage + lurch.taught * 0.4; // teaching adds up to +40%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
@@ -2382,7 +2382,7 @@ class Simulation {
       const parentCoop = (lurch.genome.intelligence + lurch.genome.perception) / 2
                        - (lurch.genome.strength + lurch.genome.size) / 4;
       if (parentCoop > 0.2 && reproCoops >= 2) {
-        reproChance *= 1 + Math.min(reproCoops * 0.2, 0.8); // up to +80% fertility in settlements
+        reproChance *= 1 + Math.min(reproCoops * 0.15, 0.5); // up to +50% fertility in settlements
       }
 
       // Local density penalty: crowded areas breed less (cooperators partially exempt)
@@ -2554,7 +2554,7 @@ class Simulation {
       // Safe terrain relief
       if (world.getTerrain(lurch.x, lurch.y).safety >= 4) stressDelta -= 3;
       // INT stress resistance: smart lurches cope better
-      const intResist = 1 - lurch.effectiveInt * 0.3; // up to 30% stress reduction
+      const intResist = 1 - lurch.effectiveInt * 0.2; // up to 20% stress reduction
       if (stressDelta > 0) stressDelta *= intResist;
       lurch.stress = Math.max(0, Math.min(100, lurch.stress + stressDelta));
 
