@@ -2247,7 +2247,7 @@ class Simulation {
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
 
       // Evasion: smart lurches can dodge attacks entirely
-      const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1; // up to ~35%
+      const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~45% (INT+SPD+PER)
       if (rng.next() < evasionChance) {
         target.stress = Math.min(100, target.stress + 5); // close call is stressful
         lurch.stress = Math.min(100, lurch.stress + 8); // wasted energy
@@ -2352,7 +2352,8 @@ class Simulation {
       world.setFood(lurch.x, lurch.y, food - eatAmount);
       // Smart foraging: small personal INT bonus + teaching community bonus
       const smartForage = lurch.effectiveInt * 0.1; // up to +10% from INT alone
-      const teachBonus = 1 + smartForage + lurch.taught * 0.3; // teaching adds up to +30%
+      const quickHands = lurch.genome.speed * 0.1; // up to +10% from SPD (fast foragers)
+      const teachBonus = 1 + smartForage + quickHands + lurch.taught * 0.3; // teaching adds up to +30%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
       lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
       lurch.energy = Math.min(100, lurch.energy + eatAmount * 2 * teachBonus);
@@ -2554,9 +2555,10 @@ class Simulation {
         if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
       }
 
-      // Hunger
+      // Hunger — VIT efficiency: healthy bodies burn calories slower
       const metabolism = 1 + lurch.genome.vitality * 0.3 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.adaptability * 0.6;
-      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5);
+      const vitEfficiency = 1 - lurch.genome.vitality * 0.1; // up to 10% slower hunger from VIT
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5 * vitEfficiency);
 
       // Energy passive drain
       if (!lurch.sleeping) {
