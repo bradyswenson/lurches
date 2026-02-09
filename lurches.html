@@ -1263,6 +1263,7 @@ class Lurch {
     this.reproCooldown = 0; // Rounds until can breed again
     this.combatCooldown = 0; // Rounds of exhaustion after a kill
     this.combatGlow = 0; // Visual-only: red aura from recent combat, decays over ~10 ticks
+    this.coopGlow = 0; // Visual-only: blue aura from cooperation (food sharing, healing), decays over ~8 ticks
 
     // State
     this.lastAction = 'none';
@@ -2701,6 +2702,9 @@ class Simulation {
           lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + share * 0.5);
           other.stress = Math.max(0, other.stress - 3);
           lurch.stress = Math.max(0, lurch.stress - 2);
+          // Both parties glow blue from cooperation
+          lurch.coopGlow = Math.max(lurch.coopGlow, 0.7);
+          other.coopGlow = Math.max(other.coopGlow, 0.5);
         }
       }
 
@@ -2708,6 +2712,7 @@ class Simulation {
       if (nearbyCoops > 0 && lurch.hp < lurch.maxHP) {
         const healAmt = Math.min(nearbyCoops * 1.5, lurch.maxHP * 0.03); // up to 3% maxHP per round
         lurch.hp = Math.min(lurch.maxHP, lurch.hp + healAmt);
+        lurch.coopGlow = Math.max(lurch.coopGlow, 0.6); // healing triggers coop glow
       }
     }
 
@@ -2838,7 +2843,8 @@ class Simulation {
         // Percentage-based damage reduction: each cooperator ally reduces damage 15%, cap 60%
         const coopShield = Math.min(0.6, coopAllies * 0.15);
         defensePower *= (1 + coopShield);
-        Events.addVfx('cooperate', target.x, target.y, 10);
+        // Cooperative defense glows blue on the defender and nearby allies
+        target.coopGlow = Math.max(target.coopGlow, 0.7);
       }
 
       const net = Math.max(1, attackPower - defensePower);
@@ -3162,7 +3168,8 @@ class Simulation {
       lurch.age++;
       if (lurch.reproCooldown > 0) lurch.reproCooldown--;
       if (lurch.combatCooldown > 0) lurch.combatCooldown--;
-      if (lurch.combatGlow > 0) lurch.combatGlow *= 0.88; // decay ~12% per tick, fades over ~10 ticks
+      if (lurch.combatGlow > 0) lurch.combatGlow *= 0.75; // decay 25% per tick, fades over ~8 ticks
+      if (lurch.coopGlow > 0) lurch.coopGlow *= 0.75; // decay 25% per tick, fades over ~8 ticks
       if (lurch.juvenile) {
         lurch.juvenileTimer--;
         if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
@@ -3461,11 +3468,32 @@ class Renderer {
             }
           }
 
-          // Teaching glow — taught lurches get a subtle warm halo
+          // Teaching glow — wisdom (gold) — taught lurches get a warm halo
           if (lurch.taught > 0) {
-            const glowAlpha = lurch.taught * 0.2;
+            const glowAlpha = lurch.taught * 0.25;
             ctx.fillStyle = `rgba(255, 220, 100, ${glowAlpha})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
+            // Wisdom bleed into surrounding cells
+            const wisdomBleed = lurch.taught * 0.08;
+            if (wisdomBleed > 0.02) {
+              ctx.fillStyle = `rgba(255, 200, 60, ${wisdomBleed})`;
+              ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
+            }
+          }
+
+          // Cooperation glow — blue aura from mutual aid (food sharing, healing, defense)
+          if (lurch.coopGlow > 0.02) {
+            const cg = lurch.coopGlow;
+            const pulse = Math.sin(now / 600 + lurch.id * 1.7) * 0.25 + 0.75;
+            // Core blue glow
+            ctx.fillStyle = `rgba(30, 100, 255, ${cg * 0.55 * pulse})`;
+            ctx.fillRect(px, py, this.cellW, this.cellH);
+            // Blue bleed into surrounding cells
+            const bleed = cg * 0.15 * pulse;
+            if (bleed > 0.02) {
+              ctx.fillStyle = `rgba(20, 80, 220, ${bleed})`;
+              ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
+            }
           }
 
           // Academy glow — soft golden aura for academy members
@@ -3569,22 +3597,6 @@ class Renderer {
         const g = life > 0.7 ? Math.floor(255 * (1 - (life - 0.7) * 3)) : Math.floor(100 * life);
         ctx.fillStyle = `rgba(${r}, ${g}, 0, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
-      } else if (vfx.type === 'combat') {
-        const pulse = Math.sin(now / 40) * 0.5 + 0.5;
-        // Bold red burst — expands slightly on hit then contracts
-        const burst = life > 0.7 ? (life - 0.7) / 0.3 : 0;
-        const expand = burst * 3;
-        ctx.fillStyle = `rgba(255, 30, 10, ${Math.min(1, life * 1.2) * (0.6 + pulse * 0.4)})`;
-        ctx.fillRect(px - expand, py - expand, this.cellW + expand * 2, this.cellH + expand * 2);
-        // Bright core flash on fresh hits
-        if (life > 0.6) {
-          ctx.fillStyle = `rgba(255, 200, 60, ${(life - 0.6) * 2})`;
-          ctx.fillRect(px, py, this.cellW, this.cellH);
-        }
-        ctx.globalAlpha = Math.min(1, life * 1.5);
-        ctx.fillStyle = '#ff6644';
-        ctx.fillText('\u2694', px + halfCellW, py + halfCellH);
-        ctx.globalAlpha = 1;
       } else if (vfx.type === 'deathflash') {
         // Aggressive blood splash — bright impact, lingering stain
         const pulse = Math.sin(now / 80 + vfx.x * 2.1) * 0.25 + 0.75;
@@ -3612,13 +3624,10 @@ class Renderer {
           ctx.globalAlpha = 1;
         }
       } else if (vfx.type === 'cooperate') {
+        // Legacy — kept for backwards compatibility but no longer spawned
         const pulse = Math.sin(now / 600) * 0.5 + 0.5;
-        ctx.fillStyle = `rgba(30, 100, 255, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
+        ctx.fillStyle = `rgba(30, 100, 255, ${life * 0.4 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
-        ctx.globalAlpha = life * 0.9;
-        ctx.fillStyle = '#4488ff';
-        ctx.fillText('\u2764', px + halfCellW, py + halfCellH);
-        ctx.globalAlpha = 1;
       } else if (vfx.type === 'sparkle') {
         const shimmer = Math.sin(now / 40 + vfx.x * 3 + vfx.y * 5) * 0.5 + 0.5;
         ctx.fillStyle = `rgba(100, 255, 140, ${life * 0.5 * (0.4 + shimmer * 0.6)})`;
