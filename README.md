@@ -2,6 +2,8 @@
 
 *A genetic simulation sandbox with an ASCII attitude.*
 
+_In the summer of 1992, two boys, between playing basketball and NES, wrote Pascal games on a 486 with 4 MB RAM and a dial-up modem. One of the games we wrote was Lurches, and now Claudue helped me manifest the nostalgia. Enjoy!_  
+
 **[Play it live at lurches.net](https://lurches.net)**
 
 Seed a toroidal world with creatures called Lurches. Watch them eat, fight, cooperate, teach, build settlements, form war bands, and evolve — then throw a meteor at them and see what survives.
