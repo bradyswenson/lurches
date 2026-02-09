@@ -533,8 +533,8 @@
       </div>
       <div class="setup-row">
         <div class="setup-field" style="flex:1;">
-          <label>Birth Rate: <span id="birth-rate-val">0.4x</span></label>
-          <input type="range" id="birth-rate" value="0.4" min="0.1" max="2.0" step="0.1" style="width:100%;">
+          <label>Birth Rate: <span id="birth-rate-val">0.6x</span></label>
+          <input type="range" id="birth-rate" value="0.6" min="0.1" max="2.0" step="0.1" style="width:100%;">
         </div>
       </div>
     </div>
@@ -791,7 +791,7 @@ const CONFIG = {
   gridH: 40,
   population: 60,
   mutationRate: 0.05,
-  birthRate: 0.4,
+  birthRate: 0.6,
   macroMutationChance: 0.02,
   foodCap: 10,
   baseFoodStart: 5,
@@ -1871,35 +1871,37 @@ const Events = {
   },
 
   wildfire(world, sim) {
-    // Find ignition point in forest
-    let sx, sy, attempts = 0;
+    // Find ignition center — prefer forest but accept anything burnable
+    let cx, cy, attempts = 0;
     do {
-      sx = world.rng.nextInt(world.w);
-      sy = world.rng.nextInt(world.h);
+      cx = world.rng.nextInt(world.w);
+      cy = world.rng.nextInt(world.h);
       attempts++;
-    } while (world.getTerrain(sx, sy) !== TERRAIN.FOREST && attempts < 200);
+    } while (world.getTerrain(cx, cy) !== TERRAIN.FOREST && attempts < 200);
 
-    // Spreading wildfire — burns outward over many rounds
+    // Scale to match meteor impact: big initial blast, then raging spread
     const sev = this._severity;
-    const spreadRate = 0.15 + sev * 0.06;   // sev1=0.21, sev5=0.45, sev10=0.75
-    const maxBurn = Math.round(30 + sev * sev * 2.5); // sev1=33, sev5=93, sev10=280
-    const dur = Math.round(10 + sev * 4);   // sev1=14, sev5=30, sev10=50 rounds
+    const igniteRadius = Math.max(1, Math.round(sev * 0.6));  // sev1=1, sev5=3, sev10=6
+    const spreadRate = 0.25 + sev * 0.07;   // sev1=0.32, sev5=0.60, sev10=0.95
+    const maxBurn = Math.round(80 + sev * sev * 5); // sev1=85, sev5=205, sev10=580
+    const dur = Math.round(15 + sev * 5);   // sev1=20, sev5=40, sev10=65 rounds
     const killChance = 0.15 + sev * 0.08;   // sev1=0.23, sev10=0.95
     const dmg = this.sevInt(40);
     const self = this;
 
-    // Initial ignition: burn just the start cell
     const burnedSet = new Set();
     const frontier = []; // cells currently on fire (spreading edge)
-    function igniteCell(x, y) {
+    const activeFires = new Set(); // track frontier cells for bright-edge VFX
+
+    function igniteCell(x, y, isFrontier) {
       const key = `${x},${y}`;
       if (burnedSet.has(key)) return;
       const t = world.getTerrain(x, y);
-      // Fire can burn forest, plains, swamp, and enhanced terrain
       const burnable = [TERRAIN.FOREST, TERRAIN.PLAINS, TERRAIN.SWAMP, TERRAIN.LUSH_FOREST, TERRAIN.FERTILE_PLAINS];
       if (!burnable.includes(t)) return;
       burnedSet.add(key);
       frontier.push([x, y]);
+      activeFires.add(key);
       // Burn terrain — enhanced terrain reverts to base Plains
       world.setTerrain(x, y, TERRAIN.PLAINS);
       world.setFood(x, y, 0);
@@ -1912,42 +1914,53 @@ const Events = {
           l.hp -= dmg;
         }
       }
-      // VFX: active fire
-      self.addVfx('fire', x, y, 25 + Math.floor(Math.random() * 15), { zone: 'perimeter' });
-      self.addVfx('ash', x, y, 60 + dur * 2 + Math.floor(Math.random() * 30));
+      // VFX: bright raging fire at frontier, longer ash trail behind
+      self.addVfx('fire', x, y, 20 + Math.floor(Math.random() * 15), { zone: 'perimeter' });
+      self.addVfx('ash', x, y, 80 + dur * 2 + Math.floor(Math.random() * 40));
     }
 
-    igniteCell(sx, sy);
+    // Initial ignition: burn a square zone (like meteor blast)
+    for (let dy = -igniteRadius; dy <= igniteRadius; dy++) {
+      for (let dx = -igniteRadius; dx <= igniteRadius; dx++) {
+        const [nx, ny] = world.wrap(cx + dx, cy + dy);
+        igniteCell(nx, ny, true);
+      }
+    }
 
-    // Ongoing spreading fire — each tick the frontier expands
+    // Ongoing spreading fire — each tick the frontier expands aggressively
     this.add({
       name: 'Wildfire', duration: dur, vfxType: 'wildfire',
       tick(w) {
         if (burnedSet.size >= maxBurn || frontier.length === 0) return;
-        // Process current frontier — cells on fire try to spread
         const currentFrontier = frontier.splice(0, frontier.length);
+        // Clear old frontier markers
+        for (const [fx, fy] of currentFrontier) {
+          activeFires.delete(`${fx},${fy}`);
+        }
         for (const [fx, fy] of currentFrontier) {
           for (const [nx, ny] of w.neighbors8(fx, fy)) {
             if (burnedSet.size >= maxBurn) return;
             const nKey = `${nx},${ny}`;
             if (burnedSet.has(nKey)) continue;
             const nt = w.getTerrain(nx, ny);
-            // Forest spreads easily, plains/swamp can catch at higher severity
             let chance = spreadRate;
-            if (nt === TERRAIN.LUSH_FOREST) chance *= 1.8; // lush burns hot
+            if (nt === TERRAIN.LUSH_FOREST) chance *= 1.8;
             else if (nt === TERRAIN.FOREST) chance *= 1.5;
-            else if (nt === TERRAIN.FERTILE_PLAINS) chance *= 0.5; // cultivated land, less brush
+            else if (nt === TERRAIN.FERTILE_PLAINS) chance *= 0.5;
             else if (nt === TERRAIN.SWAMP) chance *= 0.6;
             else if (nt === TERRAIN.PLAINS) chance *= 0.3;
-            else continue; // can't burn water, mountain, wall, etc.
+            else continue;
             if (w.rng.next() < chance) {
-              igniteCell(nx, ny);
+              igniteCell(nx, ny, true);
+              // Extra VFX: bright flare at new frontier cells
+              self.addVfx('fire', nx, ny, 18 + Math.floor(Math.random() * 12), { zone: 'perimeter' });
             }
           }
         }
       }
     });
-    sim.log(`WILDFIRE [${sev}] — Ignited at (${sx},${sy}), spreading...`, 'event');
+    const ignited = burnedSet.size;
+    sim.log(`WILDFIRE [${sev}] — Ignited ${ignited} cells at (${cx},${cy}), radius ${igniteRadius}, spreading...`, 'event');
   },
 
   earthquake(world, sim) {
@@ -3054,15 +3067,21 @@ class Renderer {
       const life = vfx.ttl / vfx.maxTtl; // 1.0 → 0.0
 
       if (vfx.type === 'fire') {
-        const flicker = Math.sin(now / 80 + vfx.x * 1.7 + vfx.y * 2.3) * 0.5 + 0.5;
-        // Background glow — red/orange
-        ctx.fillStyle = `rgba(180, 30, 0, ${life * 0.6 * (0.4 + flicker * 0.6)})`;
+        const flicker = Math.sin(now / 60 + vfx.x * 1.7 + vfx.y * 2.3) * 0.5 + 0.5;
+        const rage = Math.sin(now / 40 + vfx.x * 3.1 + vfx.y * 1.9) * 0.5 + 0.5;
+        // Raging edge: bright red-orange-yellow, pulsing intensely
+        const isFrontier = life > 0.5; // newer fires burn brightest
+        const r = isFrontier ? 255 : Math.floor(180 + flicker * 75);
+        const g = isFrontier ? Math.floor(80 + rage * 120) : Math.floor(30 + flicker * 40);
+        const b = isFrontier ? Math.floor(rage * 20) : 0;
+        // Background glow — intense at frontier, dimmer behind
+        const glowAlpha = isFrontier ? life * 0.85 * (0.6 + flicker * 0.4) : life * 0.5 * (0.3 + flicker * 0.4);
+        ctx.fillStyle = `rgba(${r}, ${Math.floor(g * 0.3)}, 0, ${glowAlpha})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
-        // Shade character: ▓ (178) on perimeter, ▒ (177) inner — both red
-        const ch = vfx.zone === 'perimeter' ? '\u2593' : '\u2592';
-        const brightness = Math.floor(180 + flicker * 75);
-        ctx.globalAlpha = life * 0.9;
-        ctx.fillStyle = `rgb(${brightness}, ${Math.floor(30 + flicker * 40)}, 0)`;
+        // Fire character: ▓ on frontier (raging), ▒ behind (smoldering)
+        const ch = isFrontier ? '\u2593' : '\u2592';
+        ctx.globalAlpha = isFrontier ? Math.min(1, life * 1.3) : life * 0.7;
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillText(ch, px + halfCellW, py + halfCellH);
         ctx.globalAlpha = 1;
       } else if (vfx.type === 'ash') {
@@ -3694,7 +3713,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   const gridH = parseInt(document.getElementById('grid-h').value) || 40;
   const popCount = parseInt(document.getElementById('pop-count').value) || 40;
   const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
-  const birthRate = parseFloat(document.getElementById('birth-rate').value) || 0.4;
+  const birthRate = parseFloat(document.getElementById('birth-rate').value) || 0.6;
   const seedStr = document.getElementById('rng-seed').value.trim();
   const mapPreset = document.getElementById('map-preset').value;
   const lurchPreset = document.getElementById('lurch-preset').value;
