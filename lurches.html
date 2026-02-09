@@ -577,6 +577,12 @@
   </div>
 
   <div id="sidepanel">
+    <div class="panel-section" id="terrain-panel">
+      <div class="panel-title">Terrain</div>
+      <div id="terrain-content" style="color:#555577;font-size:12px;">
+        Click any cell to inspect
+      </div>
+    </div>
     <div class="panel-section" id="inspector-panel">
       <div class="panel-title">Lurch Inspector</div>
       <div id="inspector-content" style="color:#555577;font-size:12px;">
@@ -2042,6 +2048,7 @@ class Simulation {
     this.eventLog = [];
     this.popHistory = [];
     this.selectedLurch = null;
+    this.selectedCell = null;
     this.godMode = false;
     this.godTool = null;
     this.tickTimer = null;
@@ -2862,6 +2869,13 @@ class Renderer {
           ctx.globalAlpha = 0.6;
           ctx.fillText(terrain.char, px + halfCellW, py + halfCellH);
           ctx.globalAlpha = 1;
+
+          // Selected cell highlight (empty terrain)
+          if (sim.selectedCell && sim.selectedCell.x === gx && sim.selectedCell.y === gy) {
+            ctx.strokeStyle = '#8888bb';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px + 1, py + 1, this.cellW - 2, this.cellH - 2);
+          }
         }
       }
     }
@@ -2972,6 +2986,7 @@ const ui = {
     this.pauseBtn = document.getElementById('pause-btn');
     this.logEl = document.getElementById('event-log');
     this.inspectorEl = document.getElementById('inspector-content');
+    this.terrainEl = document.getElementById('terrain-content');
     this.sparkCanvas = document.getElementById('sparkline-canvas');
     this.sparkCtx = this.sparkCanvas.getContext('2d');
     this.traitDistEl = document.getElementById('trait-distribution');
@@ -2990,11 +3005,12 @@ const ui = {
         if (l.genome[gene] > best.genome[gene]) best = l;
       }
       sim.selectedLurch = best;
+      sim.selectedCell = { x: best.x, y: best.y };
       // Scroll renderer to center on this lurch
       renderer.scrollX = best.x - Math.floor(renderer.visibleCols / 2);
       renderer.scrollY = best.y - Math.floor(renderer.visibleRows / 2);
       renderer.render();
-      ui.updateInspector(best);
+      ui.updateTerrain(best.x, best.y);
     });
   },
 
@@ -3042,8 +3058,10 @@ const ui = {
       this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
     }
 
-    // Inspector
-    if (sim.selectedLurch) {
+    // Inspector — update terrain and lurch panels for selected cell
+    if (sim.selectedCell) {
+      this.updateTerrain(sim.selectedCell.x, sim.selectedCell.y);
+    } else if (sim.selectedLurch) {
       this.updateInspector(sim.selectedLurch);
     }
 
@@ -3153,8 +3171,6 @@ const ui = {
     html += `<div class="stat-row"><span class="stat-label">Parents</span><span class="stat-value">${lurch.parentA ? `#${lurch.parentA} × #${lurch.parentB}` : 'Original'}</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Children</span><span class="stat-value">${lurch.children.length > 0 ? lurch.children.slice(-5).map(c => '#'+c).join(', ') : 'None'}</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Action</span><span class="stat-value">${lurch.lastAction}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Terrain</span><span class="stat-value">${world.getTerrain(lurch.x, lurch.y).name}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Position</span><span class="stat-value">(${lurch.x}, ${lurch.y})</span></div>`;
 
     // Intelligence roles
     const roles = [];
@@ -3166,6 +3182,47 @@ const ui = {
     }
 
     this.inspectorEl.innerHTML = html;
+  },
+
+  updateTerrain(x, y) {
+    const t = world.getTerrain(x, y);
+    const food = world.getFood(x, y);
+    const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap;
+    const lurchHere = world.getLurch(x, y);
+
+    let html = `<div style="color:#ccccee;font-size:13px;margin-bottom:6px;">
+      <strong style="color:${t.color}">${t.char}</strong> <strong>${t.name}</strong>
+      <span style="color:#555577;font-size:11px;">(${x}, ${y})</span>
+    </div>`;
+
+    html += `<div class="stat-row"><span class="stat-label">Food</span><span class="stat-value">${food.toFixed(1)} / ${cap}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Regen</span><span class="stat-value">${t.foodRegen}/round</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Move Cost</span><span class="stat-value">${t.moveCost}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Safety</span><span class="stat-value">${t.safety}</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Visibility</span><span class="stat-value">${t.visibility}</span></div>`;
+
+    // Special properties
+    const specials = [];
+    if (t.drowning) specials.push('<span style="color:#aa6644">Drowning risk</span>');
+    if (t.disease) specials.push('<span style="color:#aa6644">Disease risk</span>');
+    if (t.shelter) specials.push('<span style="color:#22cc44">Shelter (+HP regen)</span>');
+    if (t.enhanced) specials.push('<span style="color:#ccaa33">Enhanced terrain</span>');
+    if (t.impassable) specials.push('<span style="color:#aa4444">Impassable</span>');
+    if (t === TERRAIN.DESERT) specials.push('<span style="color:#aa6644">Energy drain</span>');
+    if (specials.length > 0) {
+      html += `<div style="margin-top:4px;font-size:11px;">${specials.join(' · ')}</div>`;
+    }
+
+    this.terrainEl.innerHTML = html;
+
+    // Update lurch inspector
+    if (lurchHere && lurchHere.alive) {
+      sim.selectedLurch = lurchHere;
+      this.updateInspector(lurchHere);
+    } else {
+      sim.selectedLurch = null;
+      this.inspectorEl.innerHTML = '<span style="color:#555577">No Lurch on this cell</span>';
+    }
   },
 
   showGodMode() {
@@ -3395,15 +3452,14 @@ function initInput() {
     ui.update();
   });
 
-  // Normal click for lurch selection (only when no god tool)
+  // Normal click for cell/lurch selection (only when no god tool)
   canvas.addEventListener('click', (e) => {
     if (sim.godTool) return; // handled by mousedown/up
     const rect = canvas.getBoundingClientRect();
     const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
-    const lurch = world.getLurch(gx, gy);
-    sim.selectedLurch = lurch || null;
+    sim.selectedCell = { x: gx, y: gy };
+    ui.updateTerrain(gx, gy);
     renderer.render();
-    ui.update();
   });
 
   // Severity slider display
@@ -3657,7 +3713,7 @@ const HELP_CONTENT = {
       <tr><td><code>Escape</code></td><td>Close panels / deselect tool</td></tr>
     </table>
     <h3>Mouse</h3>
-    <p><strong>Click</strong> a Lurch to inspect it — genome, stats, parents, children, and last action. In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it.</p>
+    <p><strong>Click</strong> any cell to inspect its terrain — food, safety, movement cost, and special properties. If a Lurch is present, the Lurch Inspector also shows genome, stats, parents, children, and last action. In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it.</p>
     <h3>Tips</h3>
     <p>Start paused and click around to explore. Press Space to run, then watch the population sparkline and event log. When things get boring — drop a meteor.</p>
   `
