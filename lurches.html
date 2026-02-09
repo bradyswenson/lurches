@@ -805,7 +805,7 @@ const CONFIG = {
   juvenileDuration: 10,
   starvationThreshold: 100,
   diseaseChance: 0.05,
-  diseaseDamage: 5,
+  diseaseDamage: 8,
   drownChance: 0.3,
   desertEnergyDrain: 5,
   kinSimilarityThreshold: 0.7,
@@ -2271,31 +2271,35 @@ const Events = {
     const patient0 = world.rng.pick(world.lurches.filter(l => l.alive));
     if (!patient0) return;
     patient0.diseased = true;
-    patient0.diseaseTurns = this.sevInt(25);
+    patient0.diseaseTurns = this.sevInt(40); // longer initial infection
     // Phase 2: Weak lurches get infected immediately (low adaptability)
-    const threshold = 0.6 - this._severity * 0.03; // sev10 → 0.3
-    const chance = 0.2 + this._severity * 0.05;
+    const threshold = 0.65 - this._severity * 0.03; // sev5 → 0.5, sev10 → 0.35
+    const chance = 0.25 + this._severity * 0.06;
     let infected = 1; // count patient zero
     for (const l of world.lurches) {
       if (l.alive && !l.diseased && l.genome.adaptability < threshold && world.rng.next() < chance) {
         l.diseased = true;
-        l.diseaseTurns = this.sevInt(20);
+        l.diseaseTurns = this.sevInt(30);
         infected++;
       }
     }
-    // Phase 3: Ongoing contagion spreads from infected to neighbors
-    const spreadRate = 0.05 + this._severity * 0.03;
-    const dur = this.sevInt(30);
+    // Phase 3: Ongoing contagion spreads from infected to neighbors each tick
+    const spreadRate = 0.08 + this._severity * 0.04; // stronger spread
+    const dur = this.sevInt(50); // lingers much longer
     this.add({
       name: 'Plague', duration: dur,
       tick(w) {
         for (const l of w.lurches) {
           if (!l.alive || !l.diseased) continue;
-          for (const [nx, ny] of w.neighbors8(l.x, l.y)) {
-            const other = w.getLurch(nx, ny);
-            if (other && other.alive && !other.diseased && w.rng.next() < spreadRate * (1 - Math.sqrt(other.genome.vitality) * 0.7 - other.genome.adaptability * 0.2)) {
-              other.diseased = true;
-              other.diseaseTurns = 10 + w.rng.nextInt(10);
+          // Spread to neighbors — range 2 so it jumps gaps
+          for (const cell of w.cellsInRadius(l.x, l.y, 2)) {
+            const other = w.getLurch(cell[0], cell[1]);
+            if (other && other.alive && !other.diseased) {
+              const resist = Math.sqrt(other.genome.vitality) * 0.6 + other.genome.adaptability * 0.25;
+              if (w.rng.next() < spreadRate * (1 - resist)) {
+                other.diseased = true;
+                other.diseaseTurns = 15 + w.rng.nextInt(15);
+              }
             }
           }
         }
@@ -3307,12 +3311,19 @@ class Renderer {
             alpha = 1;
           }
 
-          // Disease indicator — blink sickly yellow-green
+          // Disease indicator — black plague: dark pulsing aura with sickly undertone
           if (lurch.diseased) {
-            const blinkPhase = Math.sin(performance.now() / 180 + lurch.id * 0.7);
-            ctx.fillStyle = blinkPhase > 0 ? 'rgba(140, 110, 0, 0.4)' : 'rgba(80, 120, 0, 0.25)';
+            const blinkPhase = Math.sin(performance.now() / 200 + lurch.id * 0.7);
+            const severity = Math.min(1, lurch.diseaseTurns / 20); // sicker = darker
+            // Black overlay — the plague darkens the lurch
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.3 + severity * 0.25 + blinkPhase * 0.1})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
-            alpha *= (0.5 + blinkPhase * 0.25 + 0.25); // pulse between 0.5 and 1.0
+            // Sickly deep purple/black bleed into neighbors
+            if (severity > 0.3) {
+              ctx.fillStyle = `rgba(30, 5, 30, ${severity * 0.15})`;
+              ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
+            }
+            alpha *= (0.4 + blinkPhase * 0.2 + 0.2); // dimmer — the plague drains life
           }
 
           // Teaching glow — taught lurches get a subtle warm halo
