@@ -2654,6 +2654,14 @@ class Simulation {
         reproChance *= 1 + Math.min(reproCoops * 0.1, 0.25); // up to +25% fertility in settlements
       }
 
+      // Think tank fertility: INT lurches in a think tank breed more (civilization advantage)
+      if (lurch.thinkTank > 0) {
+        reproChance *= 1 + lurch.thinkTank * 3; // +0.15 to +0.45 boost (1 to 3 INT neighbors)
+      }
+      if (mate.thinkTank > 0) {
+        reproChance *= 1 + mate.thinkTank * 2; // mate's think tank helps too, slightly less
+      }
+
       // Local density penalty: crowded areas breed less (cooperators partially exempt)
       if (reproNeighbors >= 4) {
         const crowdPenalty = (reproNeighbors - 3) * 0.12;
@@ -2702,6 +2710,9 @@ class Simulation {
       mate.energy -= CONFIG.reproduceEnergyCost * 0.5;
       // Set reproduction cooldown: 4-6 rounds (healthy = shorter cooldown)
       let cooldown = Math.round(6 - healthScore * 2);
+      // INT family planning: smarter lurches recover faster between births
+      const intCooldownBonus = Math.max(lurch.effectiveInt, mate.effectiveInt);
+      cooldown = Math.max(2, Math.round(cooldown * (1 - intCooldownBonus * 0.3))); // up to 30% shorter
       // Low-population urgency: breed faster when species is at risk
       if (popSize < 100) cooldown = Math.max(2, Math.round(cooldown * (0.5 + popSize / 200)));
       lurch.reproCooldown = cooldown;
