@@ -18,6 +18,8 @@ There's no goal. You're cultivating a world and observing the consequences — o
 
 Open `lurches.html` in any browser. Pick a map, set the population, and hit **Begin Simulation**. Press `Space` to start, `+/-` to change speed, and `G` for God Mode.
 
+When you exit a simulation, you can **name and save the seed** to replay that world later. Saved seeds appear on the setup screen — click one to load all its settings. The seed guarantees the same starting conditions; evolution diverges from there.
+
 Or just visit **[lurches.net](https://lurches.net)**.
 
 ## The 7 genes
@@ -83,7 +85,7 @@ Press `G` to intervene. Drop meteors, trigger plagues, start ice ages, trigger a
 
 ## Architecture
 
-The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 4,300 lines of vanilla JS.
+The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 4,400 lines of vanilla JS. Saved seeds persist in localStorage.
 
 Deployed to [Fly.io](https://fly.io) via nginx in a Docker container.
 

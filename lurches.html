@@ -271,6 +271,72 @@
     border-color: #6a4a8a;
   }
   #confirm-ok:hover { background: #3a3260; border-color: #aa66cc; }
+  #confirm-save {
+    background: linear-gradient(180deg, #1e2e1e 0%, #1a2a1a 100%);
+    color: #88ee88;
+    border-color: #44aa44;
+  }
+  #confirm-save:hover { background: linear-gradient(180deg, #2a3e2a 0%, #243a24 100%); border-color: #66cc66; }
+  #confirm-save:disabled { opacity: 0.35; cursor: not-allowed; }
+  #seed-name-input {
+    background: #14142a;
+    border: 1px solid #2a2a44;
+    color: #ccccdd;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    width: 100%;
+    border-radius: 3px;
+    outline: none;
+    margin-top: 10px;
+    transition: border-color 0.2s;
+  }
+  #seed-name-input:focus { border-color: #44aa44; }
+  #confirm-seed-display {
+    color: #555577;
+    font-size: 11px;
+    font-family: monospace;
+    margin-top: 8px;
+  }
+  /* Saved seeds on setup screen */
+  .saved-seeds-list {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-top: 6px;
+  }
+  .saved-seed-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    background: #14142a;
+    border: 1px solid #2a2a44;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .saved-seed-item:hover { border-color: #5555aa; background: #1a1a30; }
+  .saved-seed-name {
+    color: #ccccdd;
+    font-size: 12px;
+    flex: 1;
+  }
+  .saved-seed-meta {
+    color: #555577;
+    font-size: 10px;
+    font-family: monospace;
+    margin-left: 8px;
+  }
+  .saved-seed-delete {
+    color: #554444;
+    font-size: 11px;
+    margin-left: 8px;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.2s;
+  }
+  .saved-seed-delete:hover { color: #ff4444; }
 
   /* Setup Screen */
   #setup-screen {
@@ -577,6 +643,11 @@
       </div>
     </div>
 
+    <div class="setup-group" id="saved-seeds-group" style="display:none;">
+      <div class="setup-group-title">Saved Seeds</div>
+      <div class="saved-seeds-list" id="saved-seeds-list"></div>
+    </div>
+
     <button id="start-btn">BEGIN SIMULATION</button>
     <a href="https://github.com/bradyswenson/lurches" target="_blank" rel="noopener" class="github-link" style="display:block;margin-top:12px;text-align:center;color:#555577;transition:color 0.2s;" title="View on GitHub">
       <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -708,13 +779,16 @@
   </div>
 </div>
 
-<!-- Confirm Modal -->
+<!-- Confirm / Seed Save Modal -->
 <div id="confirm-overlay">
   <div id="confirm-card">
-    <p>Return to home screen?<br><span style="color:#777788;font-size:12px;">Current simulation will be lost.</span></p>
-    <div class="confirm-btns">
+    <p>Save this seed before leaving?<br><span style="color:#777788;font-size:12px;">Name it to replay this world later.</span></p>
+    <div id="confirm-seed-display"></div>
+    <input type="text" id="seed-name-input" placeholder="Name this seed..." maxlength="30" autocomplete="off">
+    <div class="confirm-btns" style="margin-top:16px;">
       <button id="confirm-cancel">Cancel</button>
-      <button id="confirm-ok">OK</button>
+      <button id="confirm-ok">Exit</button>
+      <button id="confirm-save" disabled>Save &amp; Exit</button>
     </div>
   </div>
 </div>
@@ -3818,6 +3892,7 @@ let world, sim, renderer;
 function initInput() {
   document.addEventListener('keydown', (e) => {
     if (document.getElementById('setup-screen').style.display !== 'none') return;
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
 
     switch (e.key) {
       case ' ':
@@ -4089,6 +4164,9 @@ document.getElementById('start-btn').addEventListener('click', () => {
   CONFIG.birthRate = birthRate;
 
   const seed = seedStr ? parseInt(seedStr) || hashString(seedStr) : Math.floor(Math.random() * 2147483647);
+  CONFIG._currentSeed = seed;
+  CONFIG._currentMapPreset = mapPreset;
+  CONFIG._currentLurchPreset = lurchPreset;
   const rng = new SeededRNG(seed);
 
   // Init world
@@ -4114,10 +4192,45 @@ document.getElementById('start-btn').addEventListener('click', () => {
   initInput();
   initHelp();
 
-  // Title click → back to home (styled confirm modal)
+  // Title click → back to home (seed save modal)
   const confirmOverlay = document.getElementById('confirm-overlay');
+  const seedNameInput = document.getElementById('seed-name-input');
+  const saveBtn = document.getElementById('confirm-save');
   document.getElementById('title-btn').addEventListener('click', () => {
+    // Show current seed info
+    document.getElementById('confirm-seed-display').textContent = `Seed: ${CONFIG._currentSeed} · Map: ${CONFIG._currentMapPreset} · Lurches: ${CONFIG._currentLurchPreset}`;
+    seedNameInput.value = '';
+    saveBtn.disabled = true;
     confirmOverlay.classList.add('visible');
+    setTimeout(() => seedNameInput.focus(), 100);
+  });
+  seedNameInput.addEventListener('input', () => {
+    saveBtn.disabled = !seedNameInput.value.trim();
+  });
+  seedNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && seedNameInput.value.trim()) {
+      saveBtn.click();
+    } else if (e.key === 'Escape') {
+      confirmOverlay.classList.remove('visible');
+      seedNameInput.blur();
+    }
+  });
+  saveBtn.addEventListener('click', () => {
+    const name = seedNameInput.value.trim();
+    if (!name) return;
+    saveSeed(name, {
+      seed: CONFIG._currentSeed,
+      mapPreset: CONFIG._currentMapPreset,
+      lurchPreset: CONFIG._currentLurchPreset,
+      gridW: CONFIG.gridW,
+      gridH: CONFIG.gridH,
+      population: CONFIG.population,
+      mutationRate: CONFIG.mutationRate,
+      birthRate: CONFIG.birthRate,
+      peakPop: sim._peakPop || 0,
+      days: sim.round
+    });
+    location.reload();
   });
   document.getElementById('confirm-ok').addEventListener('click', () => {
     location.reload();
@@ -4151,6 +4264,8 @@ const HELP_CONTENT = {
     <p>Lurches carry 7 heritable genes. Offspring get a blend of both parents plus random mutations. Over time, natural selection shapes the population. The well-adapted thrive. The rest perish.</p>
     <h3>Your Role</h3>
     <p>You're not trying to win. You're cultivating a world and watching consequences. Use <strong style="color:#dd66dd">God Mode</strong> to trigger droughts, meteors, plagues — or bless a favored Lurch. See what survives.</p>
+    <h3>Saved Seeds</h3>
+    <p>Every world is generated from a seed — a number that produces the same starting terrain and population. When you exit a simulation, you can <strong>name and save</strong> the seed. Saved seeds appear on the setup screen so you can replay memorable worlds. The seed guarantees the same starting conditions; evolution diverges from there.</p>
   `,
   terrain: `
     <h3>Terrain Types</h3>
@@ -4349,6 +4464,66 @@ function initHelp() {
   // Show overview by default
   showTab('overview');
 }
+
+// ============================================================
+// SAVED SEEDS (localStorage)
+// ============================================================
+function getSavedSeeds() {
+  try { return JSON.parse(localStorage.getItem('lurches_seeds') || '[]'); }
+  catch { return []; }
+}
+function saveSeed(name, config) {
+  const seeds = getSavedSeeds();
+  seeds.unshift({ name, ...config, savedAt: Date.now() });
+  if (seeds.length > 20) seeds.length = 20; // cap at 20 saved seeds
+  localStorage.setItem('lurches_seeds', JSON.stringify(seeds));
+}
+function deleteSeed(index) {
+  const seeds = getSavedSeeds();
+  seeds.splice(index, 1);
+  localStorage.setItem('lurches_seeds', JSON.stringify(seeds));
+  renderSavedSeeds();
+}
+function renderSavedSeeds() {
+  const seeds = getSavedSeeds();
+  const group = document.getElementById('saved-seeds-group');
+  const list = document.getElementById('saved-seeds-list');
+  if (!group || !list) return;
+  if (!seeds.length) { group.style.display = 'none'; return; }
+  group.style.display = '';
+  list.innerHTML = seeds.map((s, i) => {
+    const meta = [s.mapPreset, s.lurchPreset, s.days ? `${s.days}d` : ''].filter(Boolean).join(' · ');
+    return `<div class="saved-seed-item" data-idx="${i}"><span class="saved-seed-name">${s.name}</span><span class="saved-seed-meta">${meta}</span><span class="saved-seed-delete" data-del="${i}" title="Delete">✕</span></div>`;
+  }).join('');
+  // Click to load seed
+  list.querySelectorAll('.saved-seed-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('saved-seed-delete')) return;
+      const s = seeds[parseInt(el.dataset.idx)];
+      document.getElementById('rng-seed').value = s.seed;
+      document.getElementById('map-preset').value = s.mapPreset || 'random';
+      document.getElementById('lurch-preset').value = s.lurchPreset || 'balanced';
+      document.getElementById('grid-w').value = s.gridW || 80;
+      document.getElementById('grid-h').value = s.gridH || 40;
+      document.getElementById('pop-count').value = s.population || 200;
+      document.getElementById('mutation-rate').value = s.mutationRate || 0.05;
+      if (s.birthRate) {
+        const sliderVal = s.birthRate * 2; // internal → slider value
+        document.getElementById('birth-rate').value = sliderVal;
+        document.getElementById('birth-rate-val').textContent = (sliderVal / 1.6).toFixed(1) + 'x';
+      }
+    });
+  });
+  // Delete buttons
+  list.querySelectorAll('.saved-seed-delete').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSeed(parseInt(el.dataset.del));
+    });
+  });
+}
+// Populate saved seeds on page load
+renderSavedSeeds();
 
 function hashString(str) {
   let hash = 0;
