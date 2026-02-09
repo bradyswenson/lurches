@@ -2531,6 +2531,26 @@ class Simulation {
       }
     }
 
+    // Academy edification: think tank members permanently uplift nearby lurches' INT
+    // This is the long-term cultural effect — living near an academy makes you smarter over time
+    for (const lurch of alive) {
+      if (lurch.thinkTank <= 0) continue;
+      const edifyRange = 3; // academy radiates knowledge in a 3-tile radius
+      const edifyPower = lurch.thinkTank * 0.008; // +0.0008 to +0.0016 INT per tick per academy neighbor
+      for (const cell of world.cellsInRadius(lurch.x, lurch.y, edifyRange)) {
+        const other = world.getLurch(cell[0], cell[1]);
+        if (other && other.alive && other !== lurch) {
+          // Permanent INT gene boost — small per tick, but accumulates
+          const oldInt = other.genome.intelligence;
+          other.genome.intelligence = Math.min(1, oldInt + edifyPower);
+          // If INT gene changed enough to shift dominant gene, recalculate
+          if (other.genome.intelligence !== oldInt) {
+            other.dominantGene = other.getDominantGene();
+          }
+        }
+      }
+    }
+
     // --- Cooperation Phase (high INT+PER share food, reduce stress, heal nearby) ---
     for (const lurch of alive) {
       const coopScore = (lurch.genome.intelligence + lurch.genome.perception) / 2
