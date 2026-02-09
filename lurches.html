@@ -2384,6 +2384,7 @@ class Simulation {
     this._lastPopMilestone = 0;
     this._peakPop = 0;
     this._recoveryEnergy = 0; // Burst recovery: spikes on pop crisis, decays over time
+    this._emergencyEnergy = 0; // Emergency burst: sub-25 pop, decays slower
   }
 
   log(msg, type = '') {
@@ -2618,13 +2619,18 @@ class Simulation {
 
     world._popCount = alive.length; // Cache for AI decisions
 
-    // Recovery energy: burst when pop drops below 75, decays 8% per tick
+    // Recovery energy: burst when pop drops below 75, decays 25% per tick
     if (alive.length < 75) {
-      const crisis = (75 - alive.length) / 75; // 0 at 75, 1 at 0
-      const charge = crisis * crisis * 0.32;
-      this._recoveryEnergy = Math.max(this._recoveryEnergy, charge);
+      const crisis = (75 - alive.length) / 75;
+      this._recoveryEnergy = Math.max(this._recoveryEnergy, crisis * crisis * 0.32);
     }
     this._recoveryEnergy *= 0.75; // decay 25% per tick — burst fades over ~10 ticks
+    // Emergency energy: second burst at sub-25, decays 10% per tick
+    if (alive.length < 25) {
+      const emergency = (25 - alive.length) / 25;
+      this._emergencyEnergy = Math.max(this._emergencyEnergy, emergency * emergency * 0.32);
+    }
+    this._emergencyEnergy *= 0.90; // decay 10% per tick — fades over ~25 ticks
     // Cache STR dominance fraction for aggression scaling
     let strCount = 0;
     for (const l of alive) { if (l.dominantGene === 'strength') strCount++; }
@@ -2888,9 +2894,8 @@ class Simulation {
       }
 
       // Low-population recovery: burst then decay
-      // Uses _recoveryEnergy which spikes on crisis and fades 3%/tick
-      if (this._recoveryEnergy > 0.001) {
-        reproChance *= 1 + this._recoveryEnergy;
+      if (this._recoveryEnergy > 0.001 || this._emergencyEnergy > 0.001) {
+        reproChance *= 1 + this._recoveryEnergy + this._emergencyEnergy;
       }
 
       // Event-based fertility boost (e.g., Fertile Season)
