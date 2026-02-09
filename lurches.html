@@ -2676,6 +2676,24 @@ class Simulation {
       target.stress = Math.min(100, target.stress + 20);
       this.log(`#${lurch.id} attacked #${target.id} (${Math.round(net)} dmg)`, 'combat');
       if (target.hp <= 0) {
+        // Death escape: smart lurches play dead or find a clever way out
+        const escapeChance = target.effectiveInt * 0.5; // up to 50% chance for high INT
+        if (escapeChance > 0 && rng.next() < escapeChance) {
+          target.hp = 1;
+          target.stress = 100; // traumatic experience
+          target.energy = Math.max(5, target.energy - 20);
+          // Flee to a random adjacent empty cell
+          const flee = world.emptyAdjacent(target.x, target.y);
+          if (flee) { world.moveLurch(target, flee[0], flee[1]); }
+          this.log(`#${target.id} escaped death! (played dead / clever escape)`, 'combat');
+          lurch.lastAction = `killed? #${target.id}`;
+          // Attacker thinks they won — gets spoils and cooldown
+          const spoilsMult = 1 + Math.min(packAllies, 3) * 0.08;
+          lurch.hunger = Math.max(0, lurch.hunger - 8 * spoilsMult);
+          lurch.energy = Math.min(100, lurch.energy + 5 * spoilsMult);
+          lurch.combatCooldown = 3;
+          continue;
+        }
         Events.addVfx('combat', target.x, target.y, 22);
         target.alive = false;
         target.causeOfDeath = 'combat';
@@ -2838,6 +2856,13 @@ class Simulation {
 
       // Create offspring (mutation burst scales variance + macro chance inside reproduce)
       const finalGenome = Genetics.reproduce(lurch, mate, rng, traitFreq, effMutRate, burstMult);
+
+      // INT nurturing: smart parents cultivate intelligence in offspring
+      const parentMaxInt = Math.max(lurch.effectiveInt, mate.effectiveInt);
+      if (parentMaxInt > 0.4) {
+        const nurture = (parentMaxInt - 0.4) * 0.15; // up to +0.09 INT boost
+        finalGenome.intelligence = Math.min(1, finalGenome.intelligence + nurture);
+      }
 
       const child = new Lurch(nextLurchId++, cell[0], cell[1], finalGenome, lurch.id, mate.id);
       child.birthRound = this.round;
