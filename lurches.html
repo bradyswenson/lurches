@@ -2531,19 +2531,20 @@ class Simulation {
       }
     }
 
-    // Academy edification: think tank members permanently uplift nearby lurches' INT
-    // This is the long-term cultural effect — living near an academy makes you smarter over time
+    // Academy edification: think tank members subtly uplift nearby lurches' INT
+    // Gentle cultural effect — living near an academy slowly raises baseline intelligence
+    // Capped at 0.45 so edification alone can't make INT dominant — that requires birth in an academy
     for (const lurch of alive) {
       if (lurch.thinkTank <= 0) continue;
-      const edifyRange = 3; // academy radiates knowledge in a 3-tile radius
-      const edifyPower = lurch.thinkTank * 0.008; // +0.0008 to +0.0016 INT per tick per academy neighbor
+      const edifyRange = 2; // smaller radius — you have to be close
+      const edifyPower = lurch.thinkTank * 0.002; // very subtle: ~0.0002 to ~0.0004 per tick
       for (const cell of world.cellsInRadius(lurch.x, lurch.y, edifyRange)) {
         const other = world.getLurch(cell[0], cell[1]);
-        if (other && other.alive && other !== lurch) {
-          // Permanent INT gene boost — small per tick, but accumulates
+        if (other && other.alive && other !== lurch && other.genome.intelligence < 0.45) {
           const oldInt = other.genome.intelligence;
-          other.genome.intelligence = Math.min(1, oldInt + edifyPower);
-          // If INT gene changed enough to shift dominant gene, recalculate
+          // Diminishing returns: harder to push higher
+          const diminish = 1 - (oldInt / 0.45);
+          other.genome.intelligence = Math.min(0.45, oldInt + edifyPower * diminish);
           if (other.genome.intelligence !== oldInt) {
             other.dominantGene = other.getDominantGene();
           }
@@ -2897,13 +2898,13 @@ class Simulation {
       const finalGenome = Genetics.reproduce(lurch, mate, rng, traitFreq, effMutRate, burstMult);
 
       // INT nurturing: smart parents cultivate intelligence in offspring
-      // Base nurture from parent INT, plus strong academy bonus
+      // Moderate base from parent INT, meaningful but not overwhelming academy bonus
       const parentMaxInt = Math.max(lurch.effectiveInt, mate.effectiveInt);
       const parentThinkTank = Math.max(lurch.thinkTank || 0, mate.thinkTank || 0);
-      if (parentMaxInt > 0.3) {
-        let nurture = (parentMaxInt - 0.3) * 0.2; // up to +0.14 base
-        // Academy children get much stronger nurturing — educated upbringing
-        if (parentThinkTank > 0) nurture += parentThinkTank * 1.5; // up to +0.225 more in academy
+      if (parentMaxInt > 0.4) {
+        let nurture = (parentMaxInt - 0.4) * 0.15; // up to +0.09 base
+        // Academy children get a boost — educated upbringing
+        if (parentThinkTank > 0) nurture += parentThinkTank * 0.5; // up to +0.10 more in academy
         finalGenome.intelligence = Math.min(1, finalGenome.intelligence + nurture);
       }
 
