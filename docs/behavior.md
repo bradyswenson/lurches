@@ -91,4 +91,8 @@ When the population drops below 150, layered survival mechanics activate to give
 
 **Extended mating range** — Below 150 population, mating range extends from 1 to 2 cells, so adjacent-ish Lurches can still pair up without being directly next to each other.
 
-These mechanics create natural boom-bust-recovery cycles. A population of 30 feels different from a population of 300 — the survivors are more perceptive, less violent, breed faster, and drift toward each other. It doesn't guarantee survival, but it gives them a real shot.
+**Agriculture effect** — All lurches (not just cooperators) contribute a small food regrowth bonus to nearby cells just by being present — scattered seeds, trampled soil that grows back richer. Cooperators still farm much more effectively. Groups of 2+ burn hunger 10-20% slower, modeling the reduced energy expenditure of settled life versus nomadic wandering.
+
+**Group stickiness** — Below 100 population, even non-cooperators develop a weaker version of settlement stickiness. Brutes in groups of 2+ have up to a 50% chance to stay put each round instead of wandering off. This keeps the migration-pull clusters from immediately dispersing.
+
+These mechanics create a positive feedback loop that mirrors the agricultural revolution: migration pull draws survivors together → density cultivation makes the land more productive → group hunger efficiency reduces food pressure → group stickiness keeps them from scattering. A population of 30 feels different from a population of 300 — the survivors are more perceptive, less violent, breed faster, and drift toward each other. It doesn't guarantee survival, but it gives them a real shot.

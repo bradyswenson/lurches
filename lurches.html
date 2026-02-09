@@ -893,21 +893,23 @@ class World {
   }
 
   // Regenerate food — cooperator clusters boost regrowth (farming)
+  // All lurches contribute small density bonus; cooperators contribute much more
   regenFood(foodMultiplier = 1) {
-    // Pre-compute cooperator density map for food cultivation
+    // Pre-compute cultivation map: cooperator farming + general density bonus
     const coopMap = new Float32Array(this.w * this.h);
     for (const l of this.lurches) {
       if (!l.alive) continue;
       const cs = (l.genome.intelligence + l.genome.perception) / 2
                - (l.genome.strength + l.genome.size) / 4;
-      if (cs > 0.2) {
-        // Cooperator boosts food in range 2
-        for (let dy = -2; dy <= 2; dy++) {
-          for (let dx = -2; dx <= 2; dx++) {
-            const nx = this.wrapX(l.x + dx);
-            const ny = this.wrapY(l.y + dy);
-            coopMap[ny * this.w + nx] += cs * 0.15;
-          }
+      // All lurches contribute a small density bonus to nearby food (trampled soil, scattered seeds)
+      // Cooperators contribute significantly more (intentional farming)
+      const contribution = cs > 0.2 ? cs * 0.15 : 0.03;
+      const range = cs > 0.2 ? 2 : 1; // cooperators farm wider
+      for (let dy = -range; dy <= range; dy++) {
+        for (let dx = -range; dx <= range; dx++) {
+          const nx = this.wrapX(l.x + dx);
+          const ny = this.wrapY(l.y + dy);
+          coopMap[ny * this.w + nx] += contribution;
         }
       }
     }
@@ -1310,22 +1312,35 @@ const DecisionEngine = {
     }
 
     // Settlement stickiness — cooperators in clusters stay put
+    // At low population, ALL lurches feel group stickiness (survival instinct)
     const settleCS = (lurch.genome.intelligence + lurch.genome.perception) / 2
                    - (lurch.genome.strength + lurch.genome.size) / 4;
-    if (settleCS > 0.2 && lurch.hunger < 50 && lurch.stress < 60) {
+    const pop = world._popCount || 200;
+    const isCooperator = settleCS > 0.2;
+    const groupInstinct = isCooperator || pop < 100; // brutes stick at low pop too
+    if (groupInstinct && lurch.hunger < 50 && lurch.stress < 60) {
       let sNeighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         const ally = world.getLurch(nx, ny);
         if (ally && ally.alive) {
-          const cs = (ally.genome.intelligence + ally.genome.perception) / 2
-                   - (ally.genome.strength + ally.genome.size) / 4;
-          if (cs > 0.2) sNeighbors++;
+          if (isCooperator) {
+            // Cooperators count cooperator neighbors (full settlement behavior)
+            const cs = (ally.genome.intelligence + ally.genome.perception) / 2
+                     - (ally.genome.strength + ally.genome.size) / 4;
+            if (cs > 0.2) sNeighbors++;
+          } else {
+            // Non-cooperators at low pop count ANY neighbor (survival grouping)
+            sNeighbors++;
+          }
         }
       }
       if (sNeighbors >= 2) {
-        const stayChance = Math.min(0.8, sNeighbors * 0.2);
+        // Cooperators settle more readily; non-cooperators at low pop get a weaker version
+        const stayChance = isCooperator
+          ? Math.min(0.8, sNeighbors * 0.2)
+          : Math.min(0.5, sNeighbors * 0.12); // weaker stickiness for brutes
         if (world.rng.next() < stayChance) {
-          lurch.lastAction = 'settled';
+          lurch.lastAction = isCooperator ? 'settled' : 'grouped';
           return { action: 'nothing' };
         }
       }
@@ -2718,7 +2733,15 @@ class Simulation {
       // Hunger — VIT efficiency: healthy bodies burn calories slower
       const metabolism = 1 + lurch.genome.vitality * 0.3 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.adaptability * 0.6;
       const vitEfficiency = 1 - lurch.genome.vitality * 0.1; // up to 10% slower hunger from VIT
-      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5 * vitEfficiency);
+      // Group efficiency: lurches in clusters burn less energy (settled agriculture effect)
+      // 2+ neighbors = 10% slower hunger, 4+ = 20% (cap). Models reduced need to forage/travel.
+      let groupNeighbors = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const n = world.getLurch(nx, ny);
+        if (n && n.alive) groupNeighbors++;
+      }
+      const groupEfficiency = groupNeighbors >= 2 ? 1 - Math.min(groupNeighbors * 0.05, 0.2) : 1;
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + CONFIG.hungerPerRound * metabolism * 0.5 * vitEfficiency * groupEfficiency);
 
       // Energy passive drain
       if (!lurch.sleeping) {
@@ -3765,7 +3788,8 @@ const HELP_CONTENT = {
     <h3>Enhanced Terrain &amp; Discovery</h3>
     <p>High-INT Lurches surrounded by a capable team (STR + SIZ + PER neighbors, each ≥ 0.3) can <strong>discover</strong> terrain upgrades. Desert, Ruins, and Swamp upgrade to Plains or Forest. Plains upgrades to <span style="color:#ccaa33">Fertile Plains</span>. Forest upgrades to <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has 1.5× food cap (15 instead of 10) and higher regen. Discovery costs energy — hungry Lurches don't innovate. Disasters can revert enhanced terrain back to Plains. Green <span style="color:#88ffaa">✦</span> sparkles mark discoveries.</p>
     <h3>Food &amp; Cultivation</h3>
-    <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation. Cooperator clusters boost food regrowth on nearby tiles — a form of farming that makes settlements self-sustaining.</p>
+    <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
+    <p>All Lurches contribute a small food regrowth bonus to nearby cells just by being present — scattered seeds, trampled soil. Cooperator clusters contribute significantly more, creating intentional farming that makes settlements self-sustaining. Groups of 2+ also burn hunger 10–20% slower, modeling the settled efficiency of agriculture.</p>
     <h3>Map Presets</h3>
     <p><strong>Random</strong> — procedural terrain. <strong>Pangaea</strong> — one continent. <strong>Eden</strong> — lush and abundant. <strong>The Crucible</strong> — harsh desert, tiny oasis. <strong>Archipelago</strong> — islands. <strong>Ring World</strong> — habitable ring, deadly center. <strong>Waterworld</strong> — mostly ocean.</p>
   `,
@@ -3808,6 +3832,8 @@ const HELP_CONTENT = {
     <p><strong>Migration pull</strong> — Lurches drift toward the population center instead of wandering randomly. High <span style="color:#cccccc">PER</span> and <span style="color:#4488ff">INT</span> Lurches feel the pull most strongly (up to 100% bias), while even instinctive Lurches get a 30% drift. This draws survivors together over time.</p>
     <p><strong>Aggression dampening</strong> — below 100 pop, brutes become less aggressive. At 50 pop, aggression is halved. When the species is scarce, even fighters hold back.</p>
     <p><strong>Breeding urgency</strong> — reproduction cooldown shrinks and fertility spikes at low population. Under 30 Lurches, fertility is boosted up to ~2.3×. Mating range extends from 1 to 2 cells.</p>
+    <p><strong>Agriculture effect</strong> — all Lurches contribute small food regrowth to nearby cells just by being present. Cooperators contribute much more (intentional farming). Lurches in groups of 2+ also burn hunger 10–20% slower — the settled efficiency of not needing to wander. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.</p>
+    <p><strong>Group stickiness</strong> — at low population, even non-cooperators stay near their group instead of wandering off. Brutes get a weaker version of settlement stickiness, keeping the cluster together.</p>
     <p>These mechanics create natural boom-bust-recovery cycles rather than terminal extinction spirals.</p>
     <h3>Life Cycle</h3>
     <p><strong>Bright</strong> = healthy. <strong>Dim</strong> = hungry or injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping. Lurches die from starvation, combat, old age, disease, drowning, desert exposure, or divine smiting. Fertility tapers after 60% of max age and stops at 90% — elders teach and cooperate but breed less frequently.</p>
@@ -3817,13 +3843,13 @@ const HELP_CONTENT = {
     <p>Each gene ranges from 0.0 to 1.0. Higher is stronger, but every gene has a metabolic cost — specialization comes with tradeoffs.</p>
     <table>
       <tr><th>Gene</th><th>Primary Effect</th><th>Tradeoff</th></tr>
-      <tr><td style="color:#44ff44">VIT</td><td>Disease resistance, passive healing, cold tolerance, efficient metabolism</td><td>Metabolism cost</td></tr>
-      <tr><td style="color:#44ffff">SPD</td><td>Movement speed, flee success, fast foraging</td><td>Burns energy faster</td></tr>
-      <tr><td style="color:#ff4444">STR</td><td>Attack damage, fight initiation, counter-strikes</td><td>Higher food needs</td></tr>
-      <tr><td style="color:#4488ff">INT</td><td>Decision quality, teaching, discovery, evasion, smart foraging</td><td>No direct combat bonus</td></tr>
-      <tr><td style="color:#ffff44">ADP</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
-      <tr><td style="color:#cccccc">PER</td><td>Scan range, threat detection, cooperation, evasion</td><td>Stress from crowds</td></tr>
-      <tr><td style="color:#ffffff">SIZ</td><td>Max HP, combat advantage, counter-strikes</td><td>Needs most food, easy to spot</td></tr>
+      <tr><td style="color:#44ff44">Vitality</td><td>Disease resistance, passive healing, cold tolerance, efficient metabolism</td><td>Metabolism cost</td></tr>
+      <tr><td style="color:#44ffff">Speed</td><td>Movement speed, flee success, fast foraging</td><td>Burns energy faster</td></tr>
+      <tr><td style="color:#ff4444">Strength</td><td>Attack damage, fight initiation, counter-strikes</td><td>Higher food needs</td></tr>
+      <tr><td style="color:#4488ff">Intelligence</td><td>Decision quality, teaching, discovery, evasion, smart foraging</td><td>No direct combat bonus</td></tr>
+      <tr><td style="color:#ffff44">Adaptability</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
+      <tr><td style="color:#cccccc">Perception</td><td>Scan range, threat detection, cooperation, evasion, migration pull</td><td>Stress from crowds</td></tr>
+      <tr><td style="color:#ffffff">Size</td><td>Max HP, combat advantage, counter-strikes</td><td>Needs most food, easy to spot</td></tr>
     </table>
     <h3>Inheritance</h3>
     <p>Offspring genes are a weighted blend of both parents, plus gaussian mutation (with a 2% chance of a large macro-mutation). Rare traits inherit more faithfully (rarity boost), while dominant traits above 3× their expected share are penalized — a self-correcting mechanism inspired by frequency-dependent selection that prevents any single gene from permanently taking over.</p>

@@ -60,7 +60,9 @@ The simulation produces social structures from simple rules:
 
 **Companion-seeking & migration** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner. At low population, all lurches feel a migration pull toward the population center — high INT and PER lurches feel it strongest, drifting together while dumb brutes mostly stumble.
 
-**Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, and fertility spikes. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
+**Agriculture effect** — All lurches boost food regrowth on nearby cells just by being present. Cooperators farm more effectively. Groups of 2+ burn hunger 10-20% slower — the settled efficiency of not needing to wander. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.
+
+**Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, fertility spikes, and even non-cooperators develop group stickiness. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
 
 **The tension** — Settlements create food-rich territory. War bands create the force to take it. The two strategies coexist, compete, and trade dominance over thousands of rounds.
 
