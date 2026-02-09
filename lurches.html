@@ -2383,6 +2383,7 @@ class Simulation {
     this._lastDominantTrait = null;
     this._lastPopMilestone = 0;
     this._peakPop = 0;
+    this._recoveryEnergy = 0; // Burst recovery: spikes on pop crisis, decays over time
   }
 
   log(msg, type = '') {
@@ -2616,6 +2617,20 @@ class Simulation {
     }
 
     world._popCount = alive.length; // Cache for AI decisions
+
+    // Recovery energy: burst on crisis, decay toward baseline
+    // Charges proportional to how far below 150 we are, decays 3% per tick
+    if (alive.length < 150) {
+      const crisis = (150 - alive.length) / 150; // 0 at 150, 1 at 0
+      const charge = crisis * crisis * 0.32; // same 0.32 max as before
+      if (alive.length < 75) {
+        const c2 = (75 - alive.length) / 75;
+        this._recoveryEnergy = Math.max(this._recoveryEnergy, charge + c2 * c2 * 0.32);
+      } else {
+        this._recoveryEnergy = Math.max(this._recoveryEnergy, charge);
+      }
+    }
+    this._recoveryEnergy *= 0.97; // decay 3% per tick — burst fades over ~100 ticks
     // Cache STR dominance fraction for aggression scaling
     let strCount = 0;
     for (const l of alive) { if (l.dominantGene === 'strength') strCount++; }
@@ -2878,20 +2893,10 @@ class Simulation {
         reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
       }
 
-      // Low-population recovery: less competition = easier breeding
-      // Squared curve: starts gentle, ramps up only when pop is truly critical
-      if (popSize < 150) {
-        const ratio = (150 - popSize) / 150; // 0 at 150, 1 at 0
-        let recoveryBoost = ratio * ratio * 0.32; // squared: slow start, up to +32%
-        if (popSize < 75) {
-          const r2 = (75 - popSize) / 75;
-          recoveryBoost += r2 * r2 * 0.32; // +32% more under 75 (squared)
-        }
-        if (popSize < 30) {
-          const r3 = (30 - popSize) / 30;
-          recoveryBoost += r3 * r3 * 0.32; // +32% more under 30 (emergency, squared)
-        }
-        reproChance *= 1 + recoveryBoost;
+      // Low-population recovery: burst then decay
+      // Uses _recoveryEnergy which spikes on crisis and fades 3%/tick
+      if (this._recoveryEnergy > 0.001) {
+        reproChance *= 1 + this._recoveryEnergy;
       }
 
       // Event-based fertility boost (e.g., Fertile Season)
