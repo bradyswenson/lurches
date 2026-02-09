@@ -2503,7 +2503,9 @@ class Simulation {
         }
       }
       if (intNeighbors > 0) {
-        lurch.thinkTank = Math.min(0.15, intNeighbors * 0.05); // +0.05 per INT neighbor, cap +0.15
+        // Higher INT lurches benefit more from the think tank (mastery scales with talent)
+        const intScale = 0.5 + lurch.genome.intelligence; // 0.8 at INT 0.3, up to 1.5 at INT 1.0
+        lurch.thinkTank = Math.min(0.20, intNeighbors * 0.05 * intScale); // stronger for high INT, cap +0.20
       }
     }
     // High-INT lurches boost neighbors — settlement amplification
@@ -2875,9 +2877,13 @@ class Simulation {
       const finalGenome = Genetics.reproduce(lurch, mate, rng, traitFreq, effMutRate, burstMult);
 
       // INT nurturing: smart parents cultivate intelligence in offspring
+      // Base nurture from parent INT, plus strong academy bonus
       const parentMaxInt = Math.max(lurch.effectiveInt, mate.effectiveInt);
-      if (parentMaxInt > 0.4) {
-        const nurture = (parentMaxInt - 0.4) * 0.15; // up to +0.09 INT boost
+      const parentThinkTank = Math.max(lurch.thinkTank || 0, mate.thinkTank || 0);
+      if (parentMaxInt > 0.3) {
+        let nurture = (parentMaxInt - 0.3) * 0.2; // up to +0.14 base
+        // Academy children get much stronger nurturing — educated upbringing
+        if (parentThinkTank > 0) nurture += parentThinkTank * 1.5; // up to +0.225 more in academy
         finalGenome.intelligence = Math.min(1, finalGenome.intelligence + nurture);
       }
 
