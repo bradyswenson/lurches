@@ -903,8 +903,10 @@ class World {
                - (l.genome.strength + l.genome.size) / 4;
       // All lurches contribute a small density bonus to nearby food (trampled soil, scattered seeds)
       // Cooperators contribute significantly more (intentional farming)
-      const contribution = cs > 0.2 ? cs * 0.15 : 0.03;
-      const range = cs > 0.2 ? 2 : 1; // cooperators farm wider
+      // Academy bonus: think tank members farm even better — organized agriculture
+      const academyMult = l.thinkTank > 0 ? 1 + l.thinkTank * 4 : 1; // +20% to +60% from think tank
+      const contribution = cs > 0.2 ? cs * 0.15 * academyMult : 0.03;
+      const range = cs > 0.2 ? (l.thinkTank > 0 ? 3 : 2) : 1; // academy farms even wider
       for (let dy = -range; dy <= range; dy++) {
         for (let dx = -range; dx <= range; dx++) {
           const nx = this.wrapX(l.x + dx);
