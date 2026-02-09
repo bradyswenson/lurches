@@ -2382,7 +2382,7 @@ class Simulation {
       const parentCoop = (lurch.genome.intelligence + lurch.genome.perception) / 2
                        - (lurch.genome.strength + lurch.genome.size) / 4;
       if (parentCoop > 0.2 && reproCoops >= 2) {
-        reproChance *= 1 + Math.min(reproCoops * 0.15, 0.5); // up to +50% fertility in settlements
+        reproChance *= 1 + Math.min(reproCoops * 0.1, 0.25); // up to +25% fertility in settlements
       }
 
       // Local density penalty: crowded areas breed less (cooperators partially exempt)
