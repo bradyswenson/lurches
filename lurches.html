@@ -533,8 +533,8 @@
       </div>
       <div class="setup-row">
         <div class="setup-field" style="flex:1;">
-          <label>Birth Rate: <span id="birth-rate-val">0.6x</span></label>
-          <input type="range" id="birth-rate" value="0.6" min="0.1" max="2.0" step="0.1" style="width:100%;">
+          <label>Birth Rate: <span id="birth-rate-val">1.0x</span></label>
+          <input type="range" id="birth-rate" value="1.0" min="0.2" max="4.0" step="0.2" style="width:100%;">
         </div>
       </div>
     </div>
@@ -791,7 +791,7 @@ const CONFIG = {
   gridH: 40,
   population: 60,
   mutationRate: 0.05,
-  birthRate: 0.6,
+  birthRate: 0.5,
   macroMutationChance: 0.02,
   foodCap: 10,
   baseFoodStart: 5,
@@ -799,7 +799,7 @@ const CONFIG = {
   energyPerRound: -0.5,
   sleepEnergyGain: 15,
   eatHungerReduce: 25,
-  fightEnergyCost: 25,
+  fightEnergyCost: 28,
   reproduceEnergyCost: 20,
   hideEnergyCost: 2,
   juvenileDuration: 10,
@@ -2428,7 +2428,7 @@ class Simulation {
       if (!target || !target.alive) continue;
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
-      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 10); // combat burns calories
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 12); // combat burns calories
 
       // Evasion: smart lurches can dodge attacks entirely
       const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~45% (INT+SPD+PER)
@@ -2488,9 +2488,9 @@ class Simulation {
         world.removeLurch(target);
         this.totalDeaths++;
         // Victor spoils — reduced: killing feeds you a bit, not a feast
-        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.10;
-        lurch.hunger = Math.max(0, lurch.hunger - 10 * spoilsMult);
-        lurch.energy = Math.min(100, lurch.energy + 6 * spoilsMult);
+        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.08;
+        lurch.hunger = Math.max(0, lurch.hunger - 8 * spoilsMult);
+        lurch.energy = Math.min(100, lurch.energy + 5 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
       }
       // Attacker dies from counter-strike wounds
@@ -2535,7 +2535,7 @@ class Simulation {
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
       // Smart foraging: small personal INT bonus + teaching community bonus
-      const smartForage = lurch.effectiveInt * 0.15; // up to +15% from INT alone
+      const smartForage = lurch.effectiveInt * 0.20; // up to +20% from INT alone
       const quickHands = lurch.genome.speed * 0.1; // up to +10% from SPD (fast foragers)
       const teachBonus = 1 + smartForage + quickHands + lurch.taught * 0.3; // teaching adds up to +30%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
@@ -2748,7 +2748,7 @@ class Simulation {
       // Hunger — VIT efficiency: healthy bodies burn calories slower
       const metabolism = 1 + lurch.genome.vitality * 0.3 + lurch.genome.size * 0.5 + lurch.genome.strength * 0.3 + lurch.genome.adaptability * 0.6;
       const vitEfficiency = 1 - lurch.genome.vitality * 0.1; // up to 10% slower hunger from VIT
-      const intEfficiency = 1 - lurch.effectiveInt * 0.12; // up to 12% slower hunger — smart lurches are efficient
+      const intEfficiency = 1 - lurch.effectiveInt * 0.15; // up to 15% slower hunger — smart lurches are efficient
       // Group efficiency: lurches in clusters burn less energy (settled agriculture effect)
       // 2+ neighbors = 10% slower hunger, 4+ = 20% (cap). Models reduced need to forage/travel.
       let groupNeighbors = 0;
@@ -3716,7 +3716,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   const gridH = parseInt(document.getElementById('grid-h').value) || 40;
   const popCount = parseInt(document.getElementById('pop-count').value) || 40;
   const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
-  const birthRate = parseFloat(document.getElementById('birth-rate').value) || 0.6;
+  const birthRate = (parseFloat(document.getElementById('birth-rate').value) || 1.0) / 2; // slider 1.0x = internal 0.5
   const seedStr = document.getElementById('rng-seed').value.trim();
   const mapPreset = document.getElementById('map-preset').value;
   const lurchPreset = document.getElementById('lurch-preset').value;
