@@ -2784,18 +2784,23 @@ class Simulation {
         reproChance *= 1 + Math.min(reproCoops * 0.1, 0.25); // up to +25% fertility in settlements
       }
 
-      // Think tank fertility: INT lurches in a think tank breed more (civilization advantage)
+      // Solo INT fertility: smart lurches plan optimal timing for reproduction
+      const parentInt = Math.max(lurch.effectiveInt, mate.effectiveInt);
+      reproChance *= 1 + parentInt * 0.25; // up to +25% from pure INT (works solo)
+
+      // Think tank fertility: INT lurches in a think tank breed much more (civilization advantage)
       if (lurch.thinkTank > 0) {
-        reproChance *= 1 + lurch.thinkTank * 3; // +0.15 to +0.45 boost (1 to 3 INT neighbors)
+        reproChance *= 1 + lurch.thinkTank * 5; // +0.25 to +0.75 boost (1 to 3 INT neighbors)
       }
       if (mate.thinkTank > 0) {
-        reproChance *= 1 + mate.thinkTank * 2; // mate's think tank helps too, slightly less
+        reproChance *= 1 + mate.thinkTank * 4; // mate's think tank helps too
       }
 
-      // Local density penalty: crowded areas breed less (cooperators partially exempt)
+      // Local density penalty: crowded areas breed less (cooperators + academies partially exempt)
       if (reproNeighbors >= 4) {
         const crowdPenalty = (reproNeighbors - 3) * 0.12;
-        const coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
+        let coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
+        if (lurch.thinkTank > 0) coopExempt = Math.min(0.85, coopExempt + 0.35); // academies strongly resist crowding penalty
         reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
       }
 
@@ -2842,7 +2847,8 @@ class Simulation {
       let cooldown = Math.round(6 - healthScore * 2);
       // INT family planning: smarter lurches recover faster between births
       const intCooldownBonus = Math.max(lurch.effectiveInt, mate.effectiveInt);
-      cooldown = Math.max(2, Math.round(cooldown * (1 - intCooldownBonus * 0.3))); // up to 30% shorter
+      const ttCooldownBonus = Math.max(lurch.thinkTank || 0, mate.thinkTank || 0);
+      cooldown = Math.max(2, Math.round(cooldown * (1 - intCooldownBonus * 0.35 - ttCooldownBonus * 1.5))); // up to 35% from INT + 22% from academy
       // Low-population urgency: breed faster when species is at risk
       if (popSize < 100) cooldown = Math.max(2, Math.round(cooldown * (0.5 + popSize / 200)));
       lurch.reproCooldown = cooldown;
