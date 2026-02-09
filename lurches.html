@@ -1260,6 +1260,7 @@ const DecisionEngine = {
     const mates = [];
     const empty = [];
     const teachers = [];
+    const companions = [];
 
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
@@ -1280,6 +1281,10 @@ const DecisionEngine = {
           if (other.genome.intelligence > 0.5) {
             teachers.push({ lurch: other, x: nx, y: ny, dist: d, int: other.genome.intelligence });
           }
+          // Track companions (non-threatening lurches beyond mating range)
+          if (d > 1 && !(other.genome.strength > lurch.genome.strength * 0.8)) {
+            companions.push({ lurch: other, x: nx, y: ny, dist: d });
+          }
         }
         if (!other && food > 1 && !world.getTerrain(nx, ny).impassable) {
           foods.push({ x: nx, y: ny, food, dist: d });
@@ -1297,8 +1302,8 @@ const DecisionEngine = {
       }
       return arr;
     };
-    shuffle(foods); shuffle(threats); shuffle(empty); shuffle(mates); shuffle(teachers);
-    return { foods, threats, mates, empty, teachers };
+    shuffle(foods); shuffle(threats); shuffle(empty); shuffle(mates); shuffle(teachers); shuffle(companions);
+    return { foods, threats, mates, empty, teachers, companions };
   },
 
   // Direction toward a target (toroidal)
@@ -1311,7 +1316,7 @@ const DecisionEngine = {
   },
 
   instinctive(lurch, world) {
-    const { foods, threats, mates, empty } = this.scan(lurch, world, 2);
+    const { foods, threats, mates, empty, companions } = this.scan(lurch, world, 2);
 
     // If very hungry, eat if food here
     if (lurch.hunger > 50 && world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
@@ -1357,6 +1362,13 @@ const DecisionEngine = {
       return { action: 'reproduce', mate: world.rng.pick(mates).lurch };
     }
 
+    // Seek companions when hungry (group up when resources are tight)
+    if (lurch.hunger > 40 && companions.length > 0) {
+      companions.sort((a, b) => a.dist - b.dist);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, companions[0].x, companions[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
     // Random movement
     if (world.rng.next() < 0.6) {
       return { action: 'move', dir: [world.rng.nextInt(3) - 1, world.rng.nextInt(3) - 1] };
@@ -1398,6 +1410,13 @@ const DecisionEngine = {
     if (lurch.taught > 0 && scan.teachers.length > 0) {
       scan.teachers.sort((a, b) => b.int - a.int);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.teachers[0].x, scan.teachers[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // Seek companions when hungry (group up when resources are tight)
+    if (lurch.hunger > 40 && scan.companions.length > 0) {
+      scan.companions.sort((a, b) => a.dist - b.dist);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1475,6 +1494,13 @@ const DecisionEngine = {
     // Wander toward food areas
     if (scan.foods.length > 0) {
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.foods[0].x, scan.foods[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // Seek companions when hungry (group up when resources are tight)
+    if (lurch.hunger > 35 && scan.companions.length > 0) {
+      scan.companions.sort((a, b) => a.dist - b.dist);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1598,6 +1624,13 @@ const DecisionEngine = {
     if (scan.foods.length > 0) {
       const best = scan.foods.sort((a, b) => b.food * world.getTerrain(b.x, b.y).safety - a.food * world.getTerrain(a.x, a.y).safety)[0];
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
+    // Seek companions when hungry (group up when resources are tight)
+    if (lurch.hunger > 30 && scan.companions.length > 0) {
+      scan.companions.sort((a, b) => a.dist - b.dist);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.companions[0].x, scan.companions[0].y);
       return { action: 'move', dir: [dx, dy] };
     }
 
