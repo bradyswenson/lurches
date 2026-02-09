@@ -1437,8 +1437,8 @@ const DecisionEngine = {
       }
     }
 
-    // Stockpile energy before reproducing
-    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 50 && lurch.hunger < 50) {
+    // Stockpile energy before reproducing (settlements make this easier)
+    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40 && lurch.hunger < 55) {
       // Prefer higher-stat mates
       scan.mates.sort((a, b) => {
         const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
@@ -1540,7 +1540,7 @@ const DecisionEngine = {
     }
 
     // Reproduce with optimal mates (complementary stats)
-    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 55 && lurch.hunger < 45) {
+    if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 45 && lurch.hunger < 50) {
       const scored = scan.mates.map(m => {
         let score = 0;
         for (const g of GENES) score += m.lurch.genome[g];
@@ -2246,9 +2246,11 @@ class Simulation {
 
       const net = Math.max(1, attackPower - defensePower);
       target.hp -= net;
-      // Counter-strike: defender fights back, attacker takes some damage
-      const counterPower = (target.genome.strength * 0.3 + target.genome.size * 0.2) * 8;
-      lurch.hp -= Math.max(1, Math.round(counterPower * (0.3 + rng.next() * 0.3)));
+      // Counter-strike: beefy defenders fight back
+      if (target.genome.strength > 0.4 || target.genome.size > 0.4) {
+        const counterPower = (target.genome.strength * 0.3 + target.genome.size * 0.2) * 6;
+        lurch.hp -= Math.max(1, Math.round(counterPower * (0.2 + rng.next() * 0.3)));
+      }
       lurch.lastAction = `fight #${target.id}`;
       lurch.stress = Math.min(100, lurch.stress + 18);
       target.stress = Math.min(100, target.stress + 20);
@@ -2259,10 +2261,10 @@ class Simulation {
         target.causeOfDeath = 'combat';
         world.removeLurch(target);
         this.totalDeaths++;
-        // Victor steals food — spoils capped so war bands don't fully self-sustain
-        const spoilsMult = 1 + Math.min(packAllies, 2) * 0.2;
-        lurch.hunger = Math.max(0, lurch.hunger - 15 * spoilsMult);
-        lurch.energy = Math.min(100, lurch.energy + 10 * spoilsMult);
+        // Victor steals food — spoils scale with pack but capped
+        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.2;
+        lurch.hunger = Math.max(0, lurch.hunger - 18 * spoilsMult);
+        lurch.energy = Math.min(100, lurch.energy + 12 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
       }
       // Attacker dies from counter-strike wounds
@@ -2351,12 +2353,30 @@ class Simulation {
       const healthScore = (lurch.hp / lurch.maxHP + mate.hp / mate.maxHP) / 2;
       let reproChance = healthScore * 0.6 * CONFIG.birthRate * Math.min(fertilityL, fertilityM);
 
-      // Local density penalty: crowded areas breed less
-      let neighbors = 0;
+      // Settlement fertility bonus: cooperators near cooperators breed more
+      let reproCoops = 0;
+      let reproNeighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
-        if (world.getLurch(nx, ny)) neighbors++;
+        const n = world.getLurch(nx, ny);
+        if (n) {
+          reproNeighbors++;
+          const ncs = (n.genome.intelligence + n.genome.perception) / 2
+                    - (n.genome.strength + n.genome.size) / 4;
+          if (ncs > 0.2) reproCoops++;
+        }
       }
-      if (neighbors >= 4) reproChance *= Math.max(0.1, 1 - (neighbors - 3) * 0.15);
+      const parentCoop = (lurch.genome.intelligence + lurch.genome.perception) / 2
+                       - (lurch.genome.strength + lurch.genome.size) / 4;
+      if (parentCoop > 0.2 && reproCoops >= 2) {
+        reproChance *= 1 + Math.min(reproCoops * 0.2, 0.8); // up to +80% fertility in settlements
+      }
+
+      // Local density penalty: crowded areas breed less (cooperators partially exempt)
+      if (reproNeighbors >= 4) {
+        const crowdPenalty = (reproNeighbors - 3) * 0.15;
+        const coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
+        reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
+      }
 
       if (rng.next() > reproChance) {
         lurch.lastAction = 'repro-fail';
