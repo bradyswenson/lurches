@@ -20,6 +20,7 @@ Aggressive Lurches attack adjacent neighbors when they believe they can win. The
 - **Aggression threshold** — higher STR+SIZ means more willing to fight
 - **Threat deterrence** — cooperator allies near the target make it look more dangerous
 - **HP and energy** — injured or exhausted Lurches are less aggressive
+- **Low-population dampening** — below 100 pop, aggression scales down proportionally (halved at 50, floored at 30%). Even brutes hold back when the species is scarce
 
 When a fight happens:
 

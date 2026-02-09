@@ -52,7 +52,7 @@ Reproduction is health-based, not gene-based. The chance of mating depends on:
 - **Birth rate** — Global slider set at world creation
 - **Fertility window** — Full fertility until 60% of max age, linear taper from 60% to 90%, completely infertile beyond 90%. Elders can still teach and cooperate but can't breed.
 - **Overcrowding** — Dense areas suppress reproduction
-- **Low-population recovery** — When the population drops below 150, fertility increases and Lurches can mate up to 2 cells away instead of just 1, helping populations recover from catastrophes
+- **Low-population recovery** — Below 150 pop, layered recovery kicks in: fertility boosts (+50% under 150, another +50% under 75, another +50% under 30 for up to ~2.3× total), extended mating range (1 → 2 cells), and reduced repro cooldown (halved at 50 pop, min 2 rounds). Combined with wider scan range, migration pull, and aggression dampening (see [Behavior](behavior.md)), these give struggling populations a real fighting chance
 
 No single gene controls reproduction directly. This was a deliberate design choice — in earlier versions, VIT-dominant Lurches lived longer and bred more, creating a feedback loop. Now longevity comes from a genome-hash (no single gene controls lifespan), and breeding depends purely on staying healthy.
 

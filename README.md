@@ -44,7 +44,7 @@ A Lurch's color on the grid shows its dominant gene — the one with the highest
 
 **Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round.
 
-**Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 150 population, lurches get fertility boost and extended mating range.
+**Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 150 population: fertility boost (up to 2.3× at pop 30), extended mating range, reduced repro cooldown, and migration pull toward population center.
 
 **Stress** — INT reduces incoming stress by up to 20%. PER-heavy lurches experience crowd stress penalty.
 
@@ -58,7 +58,9 @@ The simulation produces social structures from simple rules:
 
 **War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties.
 
-**Companion-seeking** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner, instinctively seeking safety in numbers.
+**Companion-seeking & migration** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner. At low population, all lurches feel a migration pull toward the population center — high INT and PER lurches feel it strongest, drifting together while dumb brutes mostly stumble.
+
+**Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, and fertility spikes. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
 
 **The tension** — Settlements create food-rich territory. War bands create the force to take it. The two strategies coexist, compete, and trade dominance over thousands of rounds.
 

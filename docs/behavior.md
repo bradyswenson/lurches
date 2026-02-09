@@ -10,19 +10,19 @@ Intelligence doesn't just make Lurches "better" — it changes how they think. T
 
 ### Instinctive (INT 0.0 – 0.2)
 
-Purely reactive. If hungry and food is adjacent, eat. If a threat is adjacent, fight or flee — coin flip. Otherwise, wander randomly. Mates with anyone nearby without evaluating quality. Seeks companions when hunger is above 40%. These Lurches survive on luck and raw stats.
+Purely reactive. If hungry and food is adjacent, eat. If a threat is adjacent, fight or flee — coin flip. Otherwise, wander randomly. Mates with anyone nearby without evaluating quality. Seeks companions when hunger is above 30%. At low population, feels a slight migration pull (30%) toward other survivors. These Lurches survive on luck and raw stats.
 
 ### Aware (INT 0.3 – 0.5)
 
-Assesses the immediate area. Moves toward visible food instead of wandering. Flees from opponents that look stronger. Prefers hiding when injured. Follows teachers if one is nearby. Seeks companions when hunger is above 40%. A meaningful step up from instinctive — these Lurches don't walk into obvious danger.
+Assesses the immediate area. Moves toward visible food instead of wandering. Flees from opponents that look stronger. Prefers hiding when injured. Follows teachers if one is nearby. Seeks companions when hunger is above 30%. At low population, moderate migration pull toward the population center. A meaningful step up from instinctive — these Lurches don't walk into obvious danger.
 
 ### Strategic (INT 0.6 – 0.8)
 
-Pathfinds toward the best food sources, weighing both nutrition and safety. Evaluates potential mates by genome quality. Retreats to safe terrain (mountains, forests) when injured. Stockpiles energy before attempting reproduction. Holds position near teachers in good terrain. Seeks companions when hunger is above 35%.
+Pathfinds toward the best food sources, weighing both nutrition and safety. Evaluates potential mates by genome quality. Retreats to safe terrain (mountains, forests) when injured. Stockpiles energy before attempting reproduction. Holds position near teachers in good terrain. Seeks companions when hunger is above 25%. Strong migration pull at low population — high PER makes the pull even stronger.
 
 ### Brilliant (INT 0.9 – 1.0)
 
-Plans ahead. Actively avoids swamp disease and desert energy traps. Assesses threats with a sophisticated model that accounts for nearby allies and deterrence. Seeks optimal mates with complementary stats. Shows territorial behavior — holds position in food-rich, safe areas rather than wandering. Seeks companions when hunger is above 30%. These are the settlement leaders and discovery captains.
+Plans ahead. Actively avoids swamp disease and desert energy traps. Assesses threats with a sophisticated model that accounts for nearby allies and deterrence. Seeks optimal mates with complementary stats. Shows territorial behavior — holds position in food-rich, safe areas rather than wandering. Seeks companions when hunger is above 20%. Strongest migration pull at low population — with high INT + PER, near-100% chance of navigating toward other survivors. These are the settlement leaders and discovery captains.
 
 ## Stress and Intelligence resistance
 
@@ -76,3 +76,19 @@ Discovery costs energy — hungry Lurches don't innovate. And disasters reset en
 Smart Lurches (INT ≥ 0.6) can detect danger and warn nearby relatives. Relatives are identified by genetic similarity — Lurches sharing more than 70% genome overlap are considered kin.
 
 Warned Lurches are more likely to flee or hide from threats. This creates emergent kin selection: family groups that cluster together survive better because they share intelligence through warnings. But they also compete for the same food, creating a natural tension between family bonds and resource pressure.
+
+## Low-population recovery
+
+When the population drops below 150, layered survival mechanics activate to give the species a fighting chance:
+
+**Wider scan range** — All AI tiers gain up to +4 bonus scan range, scaling with how low the population is. An instinctive Lurch that normally sees 2 cells now sees up to 6. A brilliant Lurch with good PER can scan 13+ cells. This lets scattered survivors detect each other across a sparse map.
+
+**Migration pull** — Each tick, the simulation computes the population centroid on the toroidal map (using circular mean). When a Lurch would otherwise wander randomly, there's a chance it drifts toward the centroid instead. The pull scales with INT + PER: base 30% for any Lurch, up to 70% for high PER, up to 60% for high INT, and near 100% for high INT + PER combined. Over dozens of rounds, scattered survivors converge.
+
+**Aggression dampening** — Below 100 population, brutes become proportionally less aggressive (halved at 50 pop, floored at 30%). When the species is scarce, even fighters instinctively hold back.
+
+**Breeding urgency** — Reproduction cooldown shrinks at low population (halved at 50 pop, minimum 2 rounds). Fertility gets a tiered boost: +50% under 150, another +50% under 75, another +50% under 30. A population of 10 Lurches has roughly 2.3× fertility.
+
+**Extended mating range** — Below 150 population, mating range extends from 1 to 2 cells, so adjacent-ish Lurches can still pair up without being directly next to each other.
+
+These mechanics create natural boom-bust-recovery cycles. A population of 30 feels different from a population of 300 — the survivors are more perceptive, less violent, breed faster, and drift toward each other. It doesn't guarantee survival, but it gives them a real shot.
