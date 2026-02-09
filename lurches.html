@@ -1151,15 +1151,15 @@ const Genetics = {
         const freq = traitFreq[g] || 0;
         if (freq < expected) {
           // Rarity boost: underrepresented genes inherit stronger
-          const rarityBoost = ((expected - freq) / expected) * 0.25;
+          const rarityBoost = ((expected - freq) / expected) * 0.2;
           if (genomeA[g] >= genomeB[g]) {
             w = Math.min(0.95, w + rarityBoost);
           } else {
             w = Math.max(0.05, w - rarityBoost);
           }
-        } else if (freq > expected * 2) {
-          // Dominance penalty: overrepresented genes regress toward mean
-          const dominancePenalty = Math.min(0.2, (freq - expected * 2) * 0.5);
+        } else if (freq > expected * 3) {
+          // Dominance penalty: heavily overrepresented genes regress toward mean
+          const dominancePenalty = Math.min(0.15, (freq - expected * 3) * 0.3);
           // Blend toward LOWER parent value (regression)
           if (genomeA[g] >= genomeB[g]) {
             w = Math.max(0.05, w - dominancePenalty);
@@ -1191,12 +1191,10 @@ const Genetics = {
 
   reproduce(parentA, parentB, rng, traitFreq) {
     const blended = Genetics.crossover(parentA.genome, parentB.genome, rng, traitFreq);
-    // Cultural inheritance: taught parents or teachers pass stronger INT to offspring
+    // Cultural inheritance: taught parents nudge offspring INT slightly
     const teacherBoost = Math.max(parentA.taught || 0, parentB.taught || 0);
-    const parentINT = Math.max(parentA.genome.intelligence, parentB.genome.intelligence);
-    if (teacherBoost > 0 || parentINT > 0.5) {
-      const culturalBoost = Math.max(teacherBoost * 0.15, (parentINT - 0.5) * 0.1);
-      blended.intelligence = Math.min(1, blended.intelligence + culturalBoost);
+    if (teacherBoost > 0) {
+      blended.intelligence = Math.min(1, blended.intelligence + teacherBoost * 0.06);
     }
     const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
     return mutated;
