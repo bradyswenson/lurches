@@ -1529,6 +1529,20 @@ const DecisionEngine = {
     // Eat if hungry and food here
     if (lurch.hunger > 40 && world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
 
+    // Academy loyalty: INT lurches in a think tank stay put unless starving
+    if (lurch.thinkTank > 0 && lurch.hunger < 60) {
+      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' }; // eat local food
+      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35) return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
+      return { action: 'nothing' }; // hold position in academy
+    }
+
+    // Think tank seeking: INT lurches seek other thinkers (before food-chasing)
+    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+      scan.thinkers.sort((a, b) => b.int - a.int);
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.thinkers[0].x, scan.thinkers[0].y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
     // Move toward visible food
     if (lurch.hunger > 30 && scan.foods.length > 0) {
       scan.foods.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
@@ -1548,13 +1562,6 @@ const DecisionEngine = {
     if (lurch.taught > 0 && scan.teachers.length > 0) {
       scan.teachers.sort((a, b) => b.int - a.int);
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.teachers[0].x, scan.teachers[0].y);
-      return { action: 'move', dir: [dx, dy] };
-    }
-
-    // Think tank seeking: INT lurches seek other thinkers
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
-      scan.thinkers.sort((a, b) => b.int - a.int);
-      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, scan.thinkers[0].x, scan.thinkers[0].y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1605,6 +1612,32 @@ const DecisionEngine = {
     // Eat strategically (wait for good food cells)
     if (lurch.hunger > 35 && world.getFood(lurch.x, lurch.y) > 2) return { action: 'eat' };
 
+    // Academy loyalty: strategic INT lurches hold position unless starving
+    if (lurch.thinkTank > 0 && lurch.hunger < 55) {
+      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
+        scan.mates.sort((a, b) => {
+          const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
+          const sb = GENES.reduce((s, g) => s + a.lurch.genome[g], 0);
+          return sa - sb;
+        });
+        return { action: 'reproduce', mate: scan.mates[0].lurch };
+      }
+      return { action: 'nothing' }; // hold position in academy
+    }
+
+    // Think tank seeking: strategic INT lurches actively seek thinker clusters
+    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+      scan.thinkers.sort((a, b) => b.int - a.int);
+      const best = scan.thinkers[0];
+      if (best.dist <= 1) {
+        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+        return { action: 'nothing' };
+      }
+      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
+      return { action: 'move', dir: [dx, dy] };
+    }
+
     // Pathfind toward food-rich areas
     if (lurch.hunger > 25) {
       scan.foods.sort((a, b) => b.food - a.food);
@@ -1616,7 +1649,6 @@ const DecisionEngine = {
 
     // Stockpile energy before reproducing (settlements make this easier)
     if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40 && lurch.hunger < 55) {
-      // Prefer higher-stat mates
       scan.mates.sort((a, b) => {
         const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
         const sb = GENES.reduce((s, g) => s + a.lurch.genome[g], 0);
@@ -1631,24 +1663,11 @@ const DecisionEngine = {
     if (lurch.taught > 0 && scan.teachers.length > 0) {
       scan.teachers.sort((a, b) => b.int - a.int);
       const teacher = scan.teachers[0];
-      // If already adjacent to teacher, hold position or eat nearby
       if (teacher.dist <= 1) {
         if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
         return { action: 'nothing' };
       }
       const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, teacher.x, teacher.y);
-      return { action: 'move', dir: [dx, dy] };
-    }
-
-    // Think tank seeking: strategic INT lurches actively seek thinker clusters
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
-      scan.thinkers.sort((a, b) => b.int - a.int);
-      const best = scan.thinkers[0];
-      if (best.dist <= 1) {
-        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
-        return { action: 'nothing' }; // hold position near thinker
-      }
-      const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
       return { action: 'move', dir: [dx, dy] };
     }
 
@@ -1724,6 +1743,50 @@ const DecisionEngine = {
       }
     }
 
+    // Academy loyalty: brilliant INT lurches in a think tank hold position unless truly hungry
+    if (lurch.thinkTank > 0 && lurch.hunger < 50) {
+      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
+        // Pick optimal mate even while holding academy
+        const scored = scan.mates.map(m => {
+          let score = 0;
+          for (const g of GENES) score += m.lurch.genome[g];
+          if (m.lurch.dominantGene !== lurch.dominantGene) score += 1;
+          return { ...m, score };
+        }).sort((a, b) => b.score - a.score);
+        return { action: 'reproduce', mate: scored[0].lurch };
+      }
+      return { action: 'nothing' }; // hold position in academy
+    }
+
+    // Think tank seeking: brilliant INT lurches prioritize thinker clusters
+    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
+      scan.thinkers.sort((a, b) => b.int - a.int);
+      const best = scan.thinkers[0];
+      if (best.dist <= 1) {
+        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+        if (terrain.safety >= 3) return { action: 'nothing' }; // hold near thinker
+      }
+      if (best.dist <= 5) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
+        return { action: 'move', dir: [dx, dy] };
+      }
+    }
+
+    // Teacher-seeking: brilliant taught lurches actively orbit teachers
+    if (lurch.taught > 0 && scan.teachers.length > 0) {
+      scan.teachers.sort((a, b) => b.int - a.int);
+      const teacher = scan.teachers[0];
+      if (teacher.dist <= 1) {
+        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
+        if (terrain.safety >= 3) return { action: 'nothing' };
+      }
+      if (teacher.dist <= 4) {
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, teacher.x, teacher.y);
+        return { action: 'move', dir: [dx, dy] };
+      }
+    }
+
     // Optimal eating
     if (lurch.hunger > 30 && world.getFood(lurch.x, lurch.y) > 3) return { action: 'eat' };
 
@@ -1753,7 +1816,6 @@ const DecisionEngine = {
 
     // Kin warning: emit danger signal
     if (scan.threats.length > 0 && lurch.genome.intelligence >= 0.6) {
-      // Flag nearby kin
       for (const cell of world.cellsInRadius(lurch.x, lurch.y, lurch.perceptionRange)) {
         const other = world.getLurch(cell[0], cell[1]);
         if (other && other !== lurch && other.alive && lurch.genomeSimilarity(other) > CONFIG.kinSimilarityThreshold) {
@@ -1763,36 +1825,6 @@ const DecisionEngine = {
     }
 
     if (lurch.energy < 35) return { action: 'sleep' };
-
-    // Teacher-seeking: brilliant taught lurches actively orbit teachers
-    if (lurch.taught > 0 && scan.teachers.length > 0) {
-      scan.teachers.sort((a, b) => b.int - a.int);
-      const teacher = scan.teachers[0];
-      if (teacher.dist <= 1) {
-        // Adjacent to teacher — hold position in good terrain, eat if possible
-        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
-        if (terrain.safety >= 3) return { action: 'nothing' };
-      }
-      // Move toward teacher — they're a strategic asset
-      if (teacher.dist <= 4) {
-        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, teacher.x, teacher.y);
-        return { action: 'move', dir: [dx, dy] };
-      }
-    }
-
-    // Think tank seeking: brilliant INT lurches prioritize thinker clusters
-    if (lurch.genome.intelligence >= 0.4 && scan.thinkers.length > 0) {
-      scan.thinkers.sort((a, b) => b.int - a.int);
-      const best = scan.thinkers[0];
-      if (best.dist <= 1) {
-        if (world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
-        if (terrain.safety >= 3) return { action: 'nothing' }; // hold near thinker
-      }
-      if (best.dist <= 5) {
-        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, best.x, best.y);
-        return { action: 'move', dir: [dx, dy] };
-      }
-    }
 
     // Territory behavior: return to known good area (high food, safe)
     if (terrain.safety >= 4 && world.getFood(lurch.x, lurch.y) > 1) {
