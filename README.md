@@ -24,23 +24,39 @@ Every Lurch carries 7 genes (0.0 to 1.0) that determine what it is, what it does
 
 | Gene | What it does | The cost |
 |------|-------------|----------|
-| **VIT** | Disease resistance, passive healing, cold tolerance | Metabolism |
-| **SPD** | Movement speed, flee success | Burns energy |
-| **STR** | Attack damage, fight initiation | Hungry |
-| **INT** | Decision quality, teaching, discovery | No combat bonus |
+| **VIT** | Disease resistance, passive healing, cold tolerance, 10% slower hunger | Metabolism |
+| **SPD** | Movement speed, flee success, +10% food efficiency from foraging | Burns energy |
+| **STR** | Attack damage, fight initiation, counter-strike trigger | Hungry |
+| **INT** | Decision quality, teaching, discovery, stress reduction, +10% food efficiency from foraging | No combat bonus |
 | **ADP** | Terrain resistance, environmental adaptation | Highest metabolism |
-| **PER** | Scan range, threat detection, cooperation | Crowd stress |
-| **SIZ** | Max HP, combat power | Needs the most food |
+| **PER** | Scan range, threat detection, cooperation, +10% dodge chance | Crowd stress |
+| **SIZ** | Max HP, combat power, counter-strike trigger | Needs the most food |
 
 A Lurch's color on the grid shows its dominant gene — the one with the highest value.
+
+## Balance parameters
+
+**Combat** — Attack multiplier 30, defense multiplier 20 (1.5:1 ratio). Evasion based on INT + SPD + PER (up to ~45% dodge chance). High STR/SIZ defenders counter-strike. Fight costs 15 energy; attacker takes 18 stress.
+
+**Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Settlement fertility bonus +25% for cooperators near cooperators.
+
+**Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round.
+
+**Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 150 population, lurches get fertility boost and extended mating range.
+
+**Stress** — INT reduces incoming stress by up to 20%. PER-heavy lurches experience crowd stress penalty.
+
+**World** — Default starting population 60. Map generation uses normalized noise for consistent terrain variety.
 
 ## Emergent behavior
 
 The simulation produces social structures from simple rules:
 
-**Settlements** — Lurches with high INT + PER cooperate instead of fight. When they cluster together, they farm nearby tiles, defend each other, teach more effectively, and resist crowding stress. They settle in place and build self-sustaining communities.
+**Settlements** — Lurches with high INT + PER cooperate instead of fight. When they cluster together, they farm nearby tiles, defend each other (15% per ally), teach more effectively, and gain fertility bonuses. They settle in place and build self-sustaining communities.
 
-**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. They naturally form raiding parties.
+**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties.
+
+**Companion-seeking** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner, instinctively seeking safety in numbers.
 
 **The tension** — Settlements create food-rich territory. War bands create the force to take it. The two strategies coexist, compete, and trade dominance over thousands of rounds.
 

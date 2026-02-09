@@ -32,7 +32,7 @@ Enhanced terrain is valuable but impermanent — environmental disasters (earthq
 
 ## Food model
 
-Each cell has a food level from 0 to 10 (15 for enhanced terrain). Food regenerates each round based on the terrain's regen rate, scaled by 0.3.
+Each cell has a food level from 0 to 10 (15 for enhanced terrain). Food regenerates each round at 35% of the terrain's foodRegen value per round (previously 30%).
 
 When a Lurch eats, it depletes cell food proportional to hunger reduction (up to 25 hunger per eat). Overpopulated areas get stripped bare quickly, forcing migration or starvation.
 
@@ -60,10 +60,15 @@ Cold damage (from ice age events) is resisted by VIT (0.5), SIZ (0.3), and ADP (
 
 Desert cells drain energy each round. Lurches with low energy can't act effectively and eventually die from exhaustion.
 
+## Map generation
+
+### Procedural generation
+The world is generated using normalized noise values to ensure consistent terrain distribution across different map sizes. Forest receives 22% of the noise range, Plains receives 20%, creating a balanced, predictable mix of biomes with natural-looking coastlines and terrain transitions.
+
 ## Map presets
 
 ### Random (default)
-Procedurally generated terrain using seeded noise. Different every time (unless you set a seed). Generally produces a good mix of biomes with natural-looking coastlines and terrain transitions.
+Procedurally generated terrain using seeded noise and normalized noise values. Different every time (unless you set a seed). Generally produces a good mix of biomes with natural-looking coastlines and terrain transitions.
 
 ### Pangaea
 One large continent surrounded by water. Interior is varied terrain — plains, forests, mountains, some desert. The water boundary creates natural population pressure. Good for watching continental evolution.

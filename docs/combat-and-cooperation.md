@@ -23,9 +23,14 @@ Aggressive Lurches attack adjacent neighbors when they believe they can win. The
 
 When a fight happens:
 
-- **Attack power** = (STR × 0.6 + SIZ × 0.4) × specialization penalty × 50 × random variance × pack bonus
-- **Defense power** = target's SIZ × 0.4 + STR × 0.3 + ADP × 0.3, plus cooperative defense bonus
+- **Attack power** = (STR × 0.6 + SIZ × 0.4) × specialization penalty × 30 × random variance × pack bonus
+- **Defense power** = target's SIZ × 0.4 + STR × 0.3 + ADP × 0.3, all multiplied by 20, plus cooperative defense bonus
+- **Terrain safety multiplier** = 3 (safe terrain like forests and mountains provide stronger defense)
+- **Evasion** — Defenders can evade attacks before combat resolves based on INT, SPD, and PER
+- **Counter-strikes** — Defenders with STR or SIZ > 0.4 automatically fight back (damage multiplier 6)
 - **Net damage** = attack - defense (minimum 1)
+- **Fight energy cost** = 15 per fighter
+- **Attacker stress gain** = 18
 - If the target dies, the attacker claims food and energy spoils
 - Kill VFX: red ⚔ flash on the target's cell
 
@@ -42,10 +47,12 @@ This naturally creates raider war bands — clusters of STR/SIZ-dominant Lurches
 
 When a cooperator is attacked, nearby cooperators rally to its defense:
 
-- Each cooperator ally within 1 tile adds **+2 flat defense** to the target
+- Each cooperator ally within 1 tile adds **+15% defense** to the target, capped at 60% total
 - This triggers the blue ❤ cooperation VFX
 
 A lone cooperator is vulnerable. A settlement full of them is a fortress. This is the core incentive for cooperators to cluster — mutual protection.
+
+**Spoils from kills** — When an attacker kills a target, they gain hunger reduction of -18 and energy of +12. Pack hunters with multiple allies (cap 3) multiply these spoils.
 
 ## Threat deterrence
 
@@ -88,6 +95,14 @@ Teachers in settlements are more effective. Each nearby cooperator adds 15% to t
 ### Stress resistance
 
 Cooperators with 2+ cooperator neighbors get 40% reduction in crowding stress. Normal Lurches get stressed in dense areas; settled cooperators don't. This lets settlements grow denser than random populations without stress-induced breakdown.
+
+### Settlement fertility bonus
+
+Cooperators in settlements gain a +25% fertility bonus, accelerating population growth in stable communities. Settlement life improves reproductive success.
+
+### Settlement crowding exemption
+
+Cooperators in settlements get a 50% exemption from crowding-based fertility penalties, allowing settlements to sustain higher density than scattered populations. However, extreme crowding still triggers a **12% penalty per neighbor beyond 3**, preventing infinite density.
 
 ## The emergent conflict
 

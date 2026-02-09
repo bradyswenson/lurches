@@ -3548,7 +3548,7 @@ const HELP_CONTENT = {
       <tr><td style="color:#7a5a8a">♠</td><td>Ruins</td><td>1</td><td>1</td><td>2</td><td>Mysterious</td></tr>
     </table>
     <h3>Food &amp; Cultivation</h3>
-    <p>Each cell regenerates food each round up to a cap of 10. Lurches deplete food by eating. Overpopulated areas get stripped bare, forcing migration or starvation. Cooperator clusters boost food regrowth on nearby tiles — a form of farming that makes settlements self-sustaining.</p>
+    <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation. Cooperator clusters boost food regrowth on nearby tiles — a form of farming that makes settlements self-sustaining.</p>
     <h3>Map Presets</h3>
     <p><strong>Random</strong> — procedural terrain. <strong>Pangaea</strong> — one continent. <strong>Eden</strong> — lush and abundant. <strong>The Crucible</strong> — harsh desert, tiny oasis. <strong>Archipelago</strong> — islands. <strong>Ring World</strong> — habitable ring, deadly center. <strong>Waterworld</strong> — mostly ocean.</p>
   `,
@@ -3567,26 +3567,29 @@ const HELP_CONTENT = {
     </table>
     <h3>Fighting &amp; War Bands</h3>
     <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors for food and energy. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally, and bigger spoils from kills. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
+    <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~45% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression.</p>
     <h3>Cooperation &amp; Settlements</h3>
-    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (allies boost each other's defense), passive healing, amplified teaching, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <h3>Grouping &amp; Survival</h3>
+    <p>When food is scarce, Lurches seek out companions instead of wandering randomly — smarter Lurches do this sooner. At low population, mating range extends and a fertility boost kicks in, modeling reduced competition for resources. These mechanics create natural boom-bust-recovery cycles rather than terminal extinction spirals.</p>
     <h3>Life Cycle</h3>
-    <p><strong>Bright</strong> = healthy. <strong>Dim</strong> = hungry or injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping. Lurches die from starvation, combat, old age, disease, drowning, desert exposure, or divine smiting. Fertility tapers after 60% of max age and stops at 80% — elders teach and cooperate but don't breed.</p>
+    <p><strong>Bright</strong> = healthy. <strong>Dim</strong> = hungry or injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping. Lurches die from starvation, combat, old age, disease, drowning, desert exposure, or divine smiting. Fertility tapers after 60% of max age and stops at 90% — elders teach and cooperate but breed less frequently.</p>
   `,
   genetics: `
     <h3>The 7 Genes</h3>
     <p>Each gene ranges from 0.0 to 1.0. Higher is stronger, but every gene has a metabolic cost — specialization comes with tradeoffs.</p>
     <table>
       <tr><th>Gene</th><th>Primary Effect</th><th>Tradeoff</th></tr>
-      <tr><td style="color:#44ff44">VIT</td><td>Disease resistance, passive healing, cold tolerance</td><td>Metabolism cost</td></tr>
-      <tr><td style="color:#44ffff">SPD</td><td>Movement speed, flee success</td><td>Burns energy faster</td></tr>
-      <tr><td style="color:#ff4444">STR</td><td>Attack damage, fight initiation</td><td>Higher food needs</td></tr>
-      <tr><td style="color:#4488ff">INT</td><td>Decision quality, teaching, discovery</td><td>No direct combat bonus</td></tr>
+      <tr><td style="color:#44ff44">VIT</td><td>Disease resistance, passive healing, cold tolerance, efficient metabolism</td><td>Metabolism cost</td></tr>
+      <tr><td style="color:#44ffff">SPD</td><td>Movement speed, flee success, fast foraging</td><td>Burns energy faster</td></tr>
+      <tr><td style="color:#ff4444">STR</td><td>Attack damage, fight initiation, counter-strikes</td><td>Higher food needs</td></tr>
+      <tr><td style="color:#4488ff">INT</td><td>Decision quality, teaching, discovery, evasion, smart foraging</td><td>No direct combat bonus</td></tr>
       <tr><td style="color:#ffff44">ADP</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
-      <tr><td style="color:#cccccc">PER</td><td>Scan range, threat detection, cooperation</td><td>Stress from crowds</td></tr>
-      <tr><td style="color:#ffffff">SIZ</td><td>Max HP, combat advantage</td><td>Needs most food, easy to spot</td></tr>
+      <tr><td style="color:#cccccc">PER</td><td>Scan range, threat detection, cooperation, evasion</td><td>Stress from crowds</td></tr>
+      <tr><td style="color:#ffffff">SIZ</td><td>Max HP, combat advantage, counter-strikes</td><td>Needs most food, easy to spot</td></tr>
     </table>
     <h3>Inheritance</h3>
-    <p>Offspring genes are a weighted blend of both parents, plus gaussian mutation (with a 2% chance of a large macro-mutation). Rare traits — those below their expected population share — inherit more faithfully, a self-correcting mechanism inspired by frequency-dependent selection.</p>
+    <p>Offspring genes are a weighted blend of both parents, plus gaussian mutation (with a 2% chance of a large macro-mutation). Rare traits inherit more faithfully (rarity boost), while dominant traits above 3× their expected share are penalized — a self-correcting mechanism inspired by frequency-dependent selection that prevents any single gene from permanently taking over.</p>
     <h3>Specialization Penalty</h3>
     <p>A Lurch that dumps everything into one gene pays a penalty. The more lopsided the genome, the less effective the dominant trait becomes. Balanced genomes are rewarded — generalists aren't flashy, but they're efficient.</p>
     <h3>Natural Selection</h3>
@@ -3597,10 +3600,10 @@ const HELP_CONTENT = {
     <p>Intelligence doesn't just make Lurches "better" — it changes <em>how they think</em>. There are four behavioral tiers:</p>
     <table>
       <tr><th>Tier</th><th>INT Range</th><th>Behavior</th></tr>
-      <tr><td style="color:#aa6644">Instinctive</td><td>0.0 – 0.2</td><td>Reactive. Fight or flee randomly. Wander aimlessly. Eat whatever's adjacent.</td></tr>
-      <tr><td style="color:#aaaa44">Aware</td><td>0.3 – 0.5</td><td>Moves toward food. Flees stronger opponents. Follows teachers.</td></tr>
-      <tr><td style="color:#44aa88">Strategic</td><td>0.6 – 0.8</td><td>Pathfinds to food-rich areas. Retreats to safe terrain. Evaluates mates.</td></tr>
-      <tr><td style="color:#4488ff">Brilliant</td><td>0.9 – 1.0</td><td>Plans ahead. Avoids disease and desert. Shows territorial behavior. Seeks optimal mates.</td></tr>
+      <tr><td style="color:#aa6644">Instinctive</td><td>0.0 – 0.2</td><td>Reactive. Fight or flee randomly. Seeks companions when hungry.</td></tr>
+      <tr><td style="color:#aaaa44">Aware</td><td>0.3 – 0.5</td><td>Moves toward food. Flees threats. Follows teachers. Groups up when food is scarce.</td></tr>
+      <tr><td style="color:#44aa88">Strategic</td><td>0.6 – 0.8</td><td>Pathfinds to food-rich areas. Retreats to safe terrain. Evaluates mates. Seeks companions early.</td></tr>
+      <tr><td style="color:#4488ff">Brilliant</td><td>0.9 – 1.0</td><td>Plans ahead. Avoids disease and desert. Territorial. Seeks optimal mates. Groups up at first sign of scarcity.</td></tr>
     </table>
     <h3>Stress</h3>
     <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>

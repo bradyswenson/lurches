@@ -40,9 +40,9 @@ When two Lurches reproduce, offspring genes are determined by:
 
 1. **Crossover** — Each gene is a weighted blend of the two parents. The blend weight is random (0.2 to 0.8), so offspring aren't simple averages.
 
-2. **Frequency-dependent bias** — For genes that are underrepresented in the population (below 1/7 ≈ 14.3% of dominant traits), the blend weight shifts up to 0.15 toward the stronger parent. This is a self-correcting mechanism: rare traits inherit more faithfully, preventing any gene from being permanently bred out. Inspired by real frequency-dependent selection in biology.
+2. **Frequency-dependent bias** — For genes that are underrepresented in the population (below 1/7 ≈ 14.3% of dominant traits), the blend weight shifts up to 0.15 toward the stronger parent. Additionally, genes appearing at 3x their expected frequency (above ~42.9%) incur a dominance penalty (strength 0.3, capped at 0.15) to prevent runaway fixation. This self-correcting mechanism prevents any gene from being permanently bred out or from completely taking over. Inspired by real frequency-dependent selection in biology.
 
-3. **Mutation** — Each gene gets a gaussian random nudge (mean 0, std proportional to mutation rate). There's also a 2% chance of a macro-mutation — a large random jump that can introduce dramatically different traits.
+3. **Mutation** — Each gene gets a gaussian random nudge (mean 0, std proportional to mutation rate). There's also a 2% chance of a macro-mutation — a large random jump that can introduce dramatically different traits. Rare genes receive a rarity boost of 0.20 to increase their survival probability.
 
 ## Reproduction
 
@@ -50,8 +50,9 @@ Reproduction is health-based, not gene-based. The chance of mating depends on:
 
 - **Health score** — Average HP percentage of both parents
 - **Birth rate** — Global slider set at world creation
-- **Fertility window** — Full fertility until 60% of max age, linear taper from 60% to 80%, completely infertile beyond 80%. Elders can still teach and cooperate but can't breed.
+- **Fertility window** — Full fertility until 60% of max age, linear taper from 60% to 90%, completely infertile beyond 90%. Elders can still teach and cooperate but can't breed.
 - **Overcrowding** — Dense areas suppress reproduction
+- **Low-population recovery** — When the population drops below 150, fertility increases and Lurches can mate up to 2 cells away instead of just 1, helping populations recover from catastrophes
 
 No single gene controls reproduction directly. This was a deliberate design choice — in earlier versions, VIT-dominant Lurches lived longer and bred more, creating a feedback loop. Now longevity comes from a genome-hash (no single gene controls lifespan), and breeding depends purely on staying healthy.
 
