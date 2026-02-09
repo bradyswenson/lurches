@@ -2354,8 +2354,9 @@ class Simulation {
       const fertilityM = agePctM < taperStart ? 1 : agePctM >= fertileEnd ? 0 : 1 - (agePctM - taperStart) / (fertileEnd - taperStart);
       if (fertilityL <= 0 || fertilityM <= 0) { lurch.lastAction = 'too-old'; continue; }
 
-      // Check adjacency
-      if (world.chebyshev(lurch.x, lurch.y, mate.x, mate.y) > 1) continue;
+      // Check mating range: adjacent normally, extends to 2 at low population
+      const mateRange = popSize < 150 ? 2 : 1;
+      if (world.chebyshev(lurch.x, lurch.y, mate.x, mate.y) > mateRange) continue;
 
       // Success chance based on health — VIT no longer directly boosts reproduction
       const healthScore = (lurch.hp / lurch.maxHP + mate.hp / mate.maxHP) / 2;
