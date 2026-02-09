@@ -472,7 +472,7 @@
         </div>
         <div class="setup-field">
           <label>Count</label>
-          <input type="number" id="pop-count" value="40" min="4" max="200">
+          <input type="number" id="pop-count" value="60" min="4" max="200">
         </div>
         <div class="setup-field">
           <label>Mutation</label>
@@ -717,7 +717,7 @@ const GENE_SHORT = { vitality:'VIT', speed:'SPD', strength:'STR', intelligence:'
 const CONFIG = {
   gridW: 80,
   gridH: 40,
-  population: 40,
+  population: 60,
   mutationRate: 0.05,
   birthRate: 0.4,
   macroMutationChance: 0.02,
@@ -727,7 +727,7 @@ const CONFIG = {
   energyPerRound: -0.5,
   sleepEnergyGain: 15,
   eatHungerReduce: 25,
-  fightEnergyCost: 10,
+  fightEnergyCost: 15,
   reproduceEnergyCost: 20,
   hideEnergyCost: 2,
   juvenileDuration: 10,
@@ -2114,7 +2114,7 @@ class Simulation {
             if (cs > 0.2) settlementBonus += 0.15; // each cooperator nearby boosts teaching 15%
           }
         }
-        const teachPower = (lurch.genome.intelligence - 0.5) * 2 * (1 + Math.min(settlementBonus, 0.6)); // cap at 60% boost
+        const teachPower = (lurch.genome.intelligence - 0.5) * 2.5 * (1 + Math.min(settlementBonus, 0.8)); // cap at 80% settlement boost
         for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
           const other = world.getLurch(nx, ny);
           if (other && other.alive && other !== lurch) {
@@ -2203,6 +2203,16 @@ class Simulation {
       if (!target || !target.alive) continue;
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
+
+      // Evasion: smart lurches can dodge attacks entirely
+      const evasionChance = target.effectiveINT * 0.35 + target.genome.speed * 0.15; // up to ~50%
+      if (rng.next() < evasionChance) {
+        target.stress = Math.min(100, target.stress + 5); // close call is stressful
+        lurch.stress = Math.min(100, lurch.stress + 8); // wasted energy
+        this.log(`#${target.id} evaded attack from #${lurch.id}`, 'combat');
+        continue;
+      }
+
       // Pack bonus: nearby brutes amplify attack power
       let packAllies = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
@@ -2228,27 +2238,40 @@ class Simulation {
         }
       }
       if (coopAllies > 0) {
-        defensePower += coopAllies * 2; // each ally adds flat defense
+        // Percentage-based damage reduction: each cooperator ally reduces damage 15%, cap 60%
+        const coopShield = Math.min(0.6, coopAllies * 0.15);
+        defensePower *= (1 + coopShield);
         Events.addVfx('cooperate', target.x, target.y, 10);
       }
 
       const net = Math.max(1, attackPower - defensePower);
       target.hp -= net;
+      // Counter-strike: defender fights back, attacker takes some damage
+      const counterPower = (target.genome.strength * 0.3 + target.genome.size * 0.2) * 8;
+      lurch.hp -= Math.max(1, Math.round(counterPower * (0.3 + rng.next() * 0.3)));
       lurch.lastAction = `fight #${target.id}`;
-      lurch.stress = Math.min(100, lurch.stress + 10);
+      lurch.stress = Math.min(100, lurch.stress + 18);
       target.stress = Math.min(100, target.stress + 20);
       this.log(`#${lurch.id} attacked #${target.id} (${Math.round(net)} dmg)`, 'combat');
       if (target.hp <= 0) {
-        Events.addVfx('combat', target.x, target.y, 12);
+        Events.addVfx('combat', target.x, target.y, 22);
         target.alive = false;
         target.causeOfDeath = 'combat';
         world.removeLurch(target);
         this.totalDeaths++;
-        // Victor steals food — the spoils of war (pack bonus = bigger spoils)
-        const spoilsMult = 1 + packAllies * 0.3;
-        lurch.hunger = Math.max(0, lurch.hunger - 20 * spoilsMult);
-        lurch.energy = Math.min(100, lurch.energy + 15 * spoilsMult);
+        // Victor steals food — spoils capped so war bands don't fully self-sustain
+        const spoilsMult = 1 + Math.min(packAllies, 2) * 0.2;
+        lurch.hunger = Math.max(0, lurch.hunger - 15 * spoilsMult);
+        lurch.energy = Math.min(100, lurch.energy + 10 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
+      }
+      // Attacker dies from counter-strike wounds
+      if (lurch.hp <= 0) {
+        lurch.alive = false;
+        lurch.causeOfDeath = 'combat';
+        world.removeLurch(lurch);
+        this.totalDeaths++;
+        this.log(`#${lurch.id} died from wounds fighting #${target.id}`, 'death');
       }
     }
 
@@ -2283,8 +2306,10 @@ class Simulation {
       const food = world.getFood(lurch.x, lurch.y);
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
-      // Teaching bonus: taught lurches extract more nutrition from food
-      const teachBonus = 1 + lurch.taught * 0.3; // up to +30% efficiency
+      // Smart foraging: INT lurches are inherently better at extracting nutrition
+      const smartForage = 1 + lurch.effectiveINT * 0.25; // up to +25% from INT alone
+      // Teaching bonus: taught lurches extract even more nutrition from food
+      const teachBonus = smartForage + lurch.taught * 0.4; // teaching adds up to +40%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
       lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
       lurch.energy = Math.min(100, lurch.energy + eatAmount * 2 * teachBonus);
@@ -2396,7 +2421,7 @@ class Simulation {
     }
 
     // --- Discovery Phase (INT + team → terrain upgrades) ---
-    if (this.round % 3 === 0) { // check every 3 rounds to save perf
+    if (this.round % 2 === 0) { // check every 2 rounds
       for (const lurch of alive) {
         if (!lurch.alive || lurch.juvenile) continue;
         if (lurch.genome.intelligence < 0.4) continue;
@@ -2418,7 +2443,7 @@ class Simulation {
 
         // Discovery chance = INT * average team skill * base rate
         const teamScore = (bestSTR + bestSIZ + bestPCP) / 3;
-        const discoveryChance = lurch.genome.intelligence * teamScore * 0.012;
+        const discoveryChance = lurch.genome.intelligence * teamScore * 0.02;
         if (rng.next() > discoveryChance) continue;
 
         // Terrain upgrade paths
@@ -2494,6 +2519,9 @@ class Simulation {
       if (adjacent > 3) stressDelta += adjacent * 2 * (1 - crowdResist);
       // Safe terrain relief
       if (world.getTerrain(lurch.x, lurch.y).safety >= 4) stressDelta -= 3;
+      // INT stress resistance: smart lurches cope better
+      const intResist = 1 - lurch.effectiveINT * 0.3; // up to 30% stress reduction
+      if (stressDelta > 0) stressDelta *= intResist;
       lurch.stress = Math.max(0, Math.min(100, lurch.stress + stressDelta));
 
       // Disease — VIT is primary immune system
@@ -2801,11 +2829,19 @@ class Renderer {
         ctx.fillStyle = `rgba(${r}, ${g}, 0, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
       } else if (vfx.type === 'combat') {
-        const pulse = Math.sin(now / 50) * 0.5 + 0.5;
-        ctx.fillStyle = `rgba(255, 20, 20, ${life * 0.7 * (0.5 + pulse * 0.5)})`;
-        ctx.fillRect(px, py, this.cellW, this.cellH);
-        ctx.globalAlpha = life * 0.9;
-        ctx.fillStyle = '#ff4444';
+        const pulse = Math.sin(now / 40) * 0.5 + 0.5;
+        // Bold red burst — expands slightly on hit then contracts
+        const burst = life > 0.7 ? (life - 0.7) / 0.3 : 0;
+        const expand = burst * 3;
+        ctx.fillStyle = `rgba(255, 30, 10, ${Math.min(1, life * 1.2) * (0.6 + pulse * 0.4)})`;
+        ctx.fillRect(px - expand, py - expand, this.cellW + expand * 2, this.cellH + expand * 2);
+        // Bright core flash on fresh hits
+        if (life > 0.6) {
+          ctx.fillStyle = `rgba(255, 200, 60, ${(life - 0.6) * 2})`;
+          ctx.fillRect(px, py, this.cellW, this.cellH);
+        }
+        ctx.globalAlpha = Math.min(1, life * 1.5);
+        ctx.fillStyle = '#ff6644';
         ctx.fillText('\u2694', px + halfCellW, py + halfCellH);
         ctx.globalAlpha = 1;
       } else if (vfx.type === 'cooperate') {
