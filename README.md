@@ -64,9 +64,9 @@ The simulation produces social structures from simple rules:
 
 **Companion-seeking & migration** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner. At low population, all lurches feel a migration pull toward the population center — high INT and PER lurches feel it strongest, drifting together while dumb brutes mostly stumble.
 
-**Agriculture effect** — All lurches boost food regrowth on nearby cells just by being present. Cooperators farm more effectively. Groups of 2+ burn hunger 10-20% slower — the settled efficiency of not needing to wander. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.
+**Agriculture effect** — All lurches boost food regrowth on nearby cells just by being present. Cooperators farm more effectively. Groups of 2+ burn hunger 10-20% slower — the efficiency of cooperative living. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.
 
-**Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, fertility spikes, and even non-cooperators develop group stickiness. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
+**Recovery mechanics** — Survival buffs activate at different thresholds: scan range and migration pull extend below 150 pop, aggression dampens below 100, and a fertility burst fires below 75 that rapidly fades back to baseline. A last-gasp emergency burst fires below 25 and lingers slightly longer. These create boom-bust-recovery cycles instead of terminal extinction spirals.
 
 **The tension** — Cooperators create food-rich territory. War bands create the force to take it. Academies create intellectual enclaves that spread INT through education and reproduction. The three strategies coexist, compete, and trade dominance over thousands of days.
 
