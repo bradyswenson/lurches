@@ -40,7 +40,7 @@ A Lurch's color on the grid shows its dominant gene — the one with the highest
 
 **Combat** — Attack multiplier 30, defense multiplier 20 (1.5:1 ratio). Evasion based on INT + SPD + PER (up to ~55% dodge chance). High STR/SIZ defenders counter-strike. Fight costs 15 energy; attacker takes 18 stress. INT lurches get solo defense from intelligence and can play dead to survive lethal hits (up to 50% chance). STR infighting kicks in when warriors dominate >25% of the population.
 
-**Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Settlement fertility bonus +25% for cooperators near cooperators. Think tank fertility can reach +75% for the parent and +60% from the mate. Academy members strongly resist crowding penalties (85%).
+**Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Settlement fertility bonus +25% for cooperators near cooperators. Academy fertility can reach +75% for the parent and +60% from the mate. Academy members strongly resist crowding penalties (85%).
 
 **Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round. Academy members farm a wider area (3 tiles) with boosted food production.
 
@@ -56,7 +56,7 @@ The simulation produces social structures from simple rules:
 
 **Settlements** — Lurches with high INT + PER cooperate instead of fight. When they cluster together, they farm nearby tiles, defend each other (15% per ally), teach more effectively, and gain fertility bonuses. They settle in place and build self-sustaining communities.
 
-**Academies** — INT lurches (≥ 0.3) near other INT lurches form think tanks, visible as a golden glow. Academy members lock down — they eat, reproduce, and hold position but almost never leave. They farm wider, resist crowding, breed faster, and nurture smarter offspring. Academies cap at 12 members; overflow disperses to seed new academies. Edification slowly boosts the INT gene of nearby INT-leaning lurches, spreading intelligence through education. Children born in academies inherit significant INT boosts from smart parents.
+**Academies** — INT lurches (≥ 0.3) near other INT lurches form academies, visible as a golden glow. Academy members lock down — they eat, reproduce, and hold position but almost never leave. They farm wider, resist crowding, breed faster, and nurture smarter offspring. Academies cap at 12 members; overflow disperses to seed new academies. Edification slowly boosts the INT gene of nearby INT-leaning lurches, spreading intelligence through education. Children born in academies inherit significant INT boosts from smart parents.
 
 **War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties. When STR dominates >25% of the population, infighting escalates — warriors turn on each other.
 
