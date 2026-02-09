@@ -1324,7 +1324,8 @@ const DecisionEngine = {
     const pop = world._popCount || 200;
     const isCooperator = settleCS > 0.2;
     const groupInstinct = isCooperator || pop < 100; // brutes stick at low pop too
-    if (groupInstinct && lurch.hunger < 50 && lurch.stress < 60) {
+    const settleHungerLimit = lurch.thinkTank > 0 ? 65 : 50; // academy members tolerate more hunger to stay
+    if (groupInstinct && lurch.hunger < settleHungerLimit && lurch.stress < 60) {
       let sNeighbors = 0;
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         const ally = world.getLurch(nx, ny);
@@ -1568,10 +1569,19 @@ const DecisionEngine = {
     if (lurch.hunger > 40 && world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
 
     // Academy loyalty: INT lurches in a think tank stay put unless starving
-    if (lurch.thinkTank > 0 && lurch.hunger < 60) {
-      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' }; // eat local food
-      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35) return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
-      return { action: 'nothing' }; // hold position in academy
+    if (lurch.thinkTank > 0) {
+      if (lurch.hunger < 60) {
+        if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+        if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35) return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
+        return { action: 'nothing' }; // hold position in academy
+      }
+      // Hungry but in academy — forage nearby (within 3 tiles) then come back, don't wander far
+      const nearFood = scan.foods.filter(f => f.dist <= 3);
+      if (nearFood.length > 0) {
+        nearFood.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+        return { action: 'move', dir: [dx, dy] };
+      }
     }
 
     // Think tank seeking: INT lurches seek other thinkers (before food-chasing)
@@ -1658,17 +1668,26 @@ const DecisionEngine = {
     if (lurch.hunger > 35 && world.getFood(lurch.x, lurch.y) > 2) return { action: 'eat' };
 
     // Academy loyalty: strategic INT lurches hold position unless starving
-    if (lurch.thinkTank > 0 && lurch.hunger < 55) {
-      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
-      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
-        scan.mates.sort((a, b) => {
-          const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
-          const sb = GENES.reduce((s, g) => s + a.lurch.genome[g], 0);
-          return sa - sb;
-        });
-        return { action: 'reproduce', mate: scan.mates[0].lurch };
+    if (lurch.thinkTank > 0) {
+      if (lurch.hunger < 55) {
+        if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+        if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
+          scan.mates.sort((a, b) => {
+            const sa = GENES.reduce((s, g) => s + b.lurch.genome[g], 0);
+            const sb = GENES.reduce((s, g) => s + a.lurch.genome[g], 0);
+            return sa - sb;
+          });
+          return { action: 'reproduce', mate: scan.mates[0].lurch };
+        }
+        return { action: 'nothing' }; // hold position in academy
       }
-      return { action: 'nothing' }; // hold position in academy
+      // Hungry but in academy — forage nearby (within 3 tiles), don't wander far
+      const nearFood = scan.foods.filter(f => f.dist <= 3);
+      if (nearFood.length > 0) {
+        nearFood.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+        return { action: 'move', dir: [dx, dy] };
+      }
     }
 
     // Think tank seeking: strategic INT lurches actively seek thinker clusters
@@ -1796,19 +1815,28 @@ const DecisionEngine = {
     }
 
     // Academy loyalty: brilliant INT lurches in a think tank hold position unless truly hungry
-    if (lurch.thinkTank > 0 && lurch.hunger < 50) {
-      if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
-      if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
-        // Pick optimal mate even while holding academy
-        const scored = scan.mates.map(m => {
-          let score = 0;
-          for (const g of GENES) score += m.lurch.genome[g];
-          if (m.lurch.dominantGene !== lurch.dominantGene) score += 1;
-          return { ...m, score };
-        }).sort((a, b) => b.score - a.score);
-        return { action: 'reproduce', mate: scored[0].lurch };
+    if (lurch.thinkTank > 0) {
+      if (lurch.hunger < 50) {
+        if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
+        if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
+          // Pick optimal mate even while holding academy
+          const scored = scan.mates.map(m => {
+            let score = 0;
+            for (const g of GENES) score += m.lurch.genome[g];
+            if (m.lurch.dominantGene !== lurch.dominantGene) score += 1;
+            return { ...m, score };
+          }).sort((a, b) => b.score - a.score);
+          return { action: 'reproduce', mate: scored[0].lurch };
+        }
+        return { action: 'nothing' }; // hold position in academy
       }
-      return { action: 'nothing' }; // hold position in academy
+      // Hungry but in academy — forage nearby (within 3 tiles), don't abandon the group
+      const nearFood = scan.foods.filter(f => f.dist <= 3);
+      if (nearFood.length > 0) {
+        nearFood.sort((a, b) => b.food * world.getTerrain(b.x, b.y).safety - a.food * world.getTerrain(a.x, a.y).safety);
+        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+        return { action: 'move', dir: [dx, dy] };
+      }
     }
 
     // Think tank seeking: brilliant INT lurches prioritize thinker clusters
