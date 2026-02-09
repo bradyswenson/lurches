@@ -2224,8 +2224,8 @@ class Simulation {
         }
       }
       const packBonus = 1 + packAllies * 0.2; // each brute ally adds 20% attack
-      const attackPower = (lurch.genome.strength * 0.6 + lurch.genome.size * 0.4) * lurch.specPenalty * 50 * (0.5 + rng.next() * 0.5) * packBonus;
-      let defensePower = (target.genome.size * 0.5 + target.genome.strength * 0.3 + target.genome.adaptability * 0.2) * 8 + world.getTerrain(target.x, target.y).safety * 2;
+      const attackPower = (lurch.genome.strength * 0.6 + lurch.genome.size * 0.4) * lurch.specPenalty * 30 * (0.5 + rng.next() * 0.5) * packBonus;
+      let defensePower = (target.genome.size * 0.5 + target.genome.strength * 0.3 + target.genome.adaptability * 0.2) * 20 + world.getTerrain(target.x, target.y).safety * 3;
 
       // Cooperative defense: nearby cooperators rally to defend
       let coopAllies = 0;
