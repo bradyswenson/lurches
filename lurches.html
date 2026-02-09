@@ -3058,17 +3058,17 @@ const ui = {
       this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
     }
 
-    // Inspector — refresh terrain (food changes) and lurch (if still selected & alive)
-    if (sim.selectedCell) {
-      this.updateTerrain(sim.selectedCell.x, sim.selectedCell.y);
-    }
+    // Inspector — refresh terrain and lurch panels
     if (sim.selectedLurch) {
       if (sim.selectedLurch.alive) {
+        this.updateTerrain(sim.selectedLurch.x, sim.selectedLurch.y);
         this.updateInspector(sim.selectedLurch);
       } else {
         this.inspectorEl.innerHTML = '<span style="color:#555577">Lurch died</span>';
         sim.selectedLurch = null;
       }
+    } else if (sim.selectedCell) {
+      this.updateTerrain(sim.selectedCell.x, sim.selectedCell.y);
     }
 
     // Timeline (update every 20 rounds to reduce DOM thrash)
