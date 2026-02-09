@@ -3628,6 +3628,48 @@ class Renderer {
         ctx.globalAlpha = 1;
       }
     }
+
+    // Legend overlay
+    this.renderLegend(ctx, now);
+  }
+
+  renderLegend(ctx, now) {
+    const cw = this.canvas.width;
+    const items = [
+      { label: 'Wisdom',      r: 255, g: 200, b: 50,  speed: 800 },
+      { label: 'Cooperation',  r: 30,  g: 100, b: 255, speed: 600 },
+      { label: 'Combat',       r: 255, g: 20,  b: 10,  speed: 150 },
+    ];
+    const blockW = 10, blockH = 10;
+    const lineH = 16;
+    const padR = 10, padT = 8;
+    const totalH = items.length * lineH + padT;
+    const x0 = cw - padR - 90;
+    const y0 = padT;
+
+    ctx.save();
+    ctx.font = '10px monospace';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const y = y0 + i * lineH;
+      const pulse = Math.sin(now / item.speed + i * 2.1) * 0.25 + 0.75; // 0.5 – 1.0
+
+      // Pulsing color block
+      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.55 * pulse})`;
+      ctx.fillRect(x0, y, blockW, blockH);
+      // Subtle glow bleed
+      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.12 * pulse})`;
+      ctx.fillRect(x0 - 2, y - 2, blockW + 4, blockH + 4);
+
+      // Label
+      ctx.fillStyle = `rgba(170, 170, 200, ${0.45 * pulse})`;
+      ctx.fillText(item.label, x0 + blockW + 6, y + blockH / 2);
+    }
+
+    ctx.restore();
   }
 
   // Convert pixel coords to grid coords
