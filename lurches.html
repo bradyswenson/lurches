@@ -1386,7 +1386,7 @@ const DecisionEngine = {
   // Smart lurches can sense each other from much further than normal scan range
   intBeacon(lurch, world) {
     if (lurch.genome.intelligence < 0.3) return null;
-    const beaconRange = 6 + Math.round(lurch.genome.intelligence * 6); // 6-12 tiles
+    const beaconRange = 10 + Math.round(lurch.genome.intelligence * 10); // 10-20 tiles
     let closest = null;
     let closestDist = Infinity;
     let bestCluster = null;
@@ -1493,13 +1493,20 @@ const DecisionEngine = {
     // Low-population dampening: when everyone's scarce, even brutes hold back
     const pop = world._popCount || 200;
     if (pop < 100) aggression *= Math.max(0.3, pop / 100);
+    // STR overpopulation infighting: too many warriors = territorial fights over resources
+    const strFrac = world._strFraction || 0;
+    if (strFrac > 0.25 && aggression > 0) {
+      aggression *= 1 + (strFrac - 0.25) * 2; // at 50% STR, aggression x1.5 — they fight each other more
+    }
     if (aggression > 0.2 && lurch.energy > 20 && lurch.combatCooldown <= 0) {
       // Look for weaker adjacent lurches to bully
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         const other = world.getLurch(nx, ny);
         if (other && other.alive && other !== lurch) {
           const myPower = lurch.genome.strength * 0.6 + lurch.genome.size * 0.4;
-          const theirPower = other.genome.strength * 0.6 + other.genome.size * 0.4;
+          // INT deterrence: smart lurches look dangerous — they might be tricky
+          const intDeter = other.effectiveInt * 0.3; // INT adds perceived toughness
+          const theirPower = other.genome.strength * 0.6 + other.genome.size * 0.4 + intDeter;
           // Threat deterrence: count cooperator allies near target
           let coopAllies = 0;
           for (const [ax, ay] of world.neighbors8(other.x, other.y)) {
@@ -2564,6 +2571,10 @@ class Simulation {
     }
 
     world._popCount = alive.length; // Cache for AI decisions
+    // Cache STR dominance fraction for aggression scaling
+    let strCount = 0;
+    for (const l of alive) { if (l.dominantGene === 'strength') strCount++; }
+    world._strFraction = alive.length > 0 ? strCount / alive.length : 0;
 
     // Compute population centroid on torus for migration pull
     // Uses circular mean: convert positions to angles, average sin/cos
