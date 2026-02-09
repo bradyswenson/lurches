@@ -464,6 +464,28 @@
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: #0a0a14; }
   ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+
+  /* Mobile notice */
+  #mobile-notice {
+    display: none;
+    background: #1a1a2e;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin: 20px;
+    max-width: 340px;
+    text-align: center;
+    color: #8888aa;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  #mobile-notice h2 { color: #ccccee; font-size: 18px; margin: 0 0 12px 0; letter-spacing: 2px; }
+  #mobile-notice .ascii-lurches { color: #555577; font-family: monospace; font-size: 12px; margin: 14px 0; }
+  #mobile-notice a { color: #4488ff; text-decoration: none; }
+  @media (max-width: 768px) {
+    #mobile-notice { display: block; }
+    .setup-card { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -472,6 +494,12 @@
 <!-- SETUP SCREEN                           -->
 <!-- ═══════════════════════════════════════ -->
 <div id="setup-screen">
+  <div id="mobile-notice">
+    <h2>LURCHES</h2>
+    <div class="ascii-lurches">~..##^^..<span style="color:#ff4444">@</span>.##^^""^^##...<span style="color:#44ff44">@</span>..~</div>
+    <p>Lurches is best experienced on a laptop or desktop — the simulation needs a keyboard and a wider screen to really come alive.</p>
+    <p style="color:#666688; font-size:12px; margin-top:16px;">Bookmark <a href="https://lurches.net">lurches.net</a> and come back on a bigger screen. Your lurches will wait.</p>
+  </div>
   <div class="setup-card">
     <div class="setup-header">
       <h1>LURCHES</h1>
