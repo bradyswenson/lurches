@@ -799,7 +799,7 @@ const CONFIG = {
   energyPerRound: -0.5,
   sleepEnergyGain: 15,
   eatHungerReduce: 25,
-  fightEnergyCost: 20,
+  fightEnergyCost: 25,
   reproduceEnergyCost: 20,
   hideEnergyCost: 2,
   juvenileDuration: 10,
@@ -2428,7 +2428,7 @@ class Simulation {
       if (!target || !target.alive) continue;
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
-      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 5); // combat burns calories
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 10); // combat burns calories
 
       // Evasion: smart lurches can dodge attacks entirely
       const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~45% (INT+SPD+PER)
@@ -2488,7 +2488,7 @@ class Simulation {
         world.removeLurch(target);
         this.totalDeaths++;
         // Victor spoils — reduced: killing feeds you a bit, not a feast
-        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.15;
+        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.10;
         lurch.hunger = Math.max(0, lurch.hunger - 10 * spoilsMult);
         lurch.energy = Math.min(100, lurch.energy + 6 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
