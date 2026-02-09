@@ -2881,9 +2881,9 @@ class Simulation {
       // Low-population recovery: less competition = easier breeding
       // Steeper curve at very low pop: gradual boost to 150, strong boost under 75, emergency under 30
       if (popSize < 150) {
-        let recoveryBoost = (150 - popSize) / 150 * 0.55; // base: up to +55% (+10% over original)
-        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.55; // +55% more under 75
-        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.55; // +55% more under 30 (emergency)
+        let recoveryBoost = (150 - popSize) / 150 * 0.45; // base: up to +45%
+        if (popSize < 75) recoveryBoost += (75 - popSize) / 75 * 0.45; // +45% more under 75
+        if (popSize < 30) recoveryBoost += (30 - popSize) / 30 * 0.45; // +45% more under 30 (emergency)
         reproChance *= 1 + recoveryBoost;
       }
 
