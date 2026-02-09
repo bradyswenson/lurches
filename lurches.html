@@ -845,7 +845,7 @@ class World {
       const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap;
       if (this.food[i] < cap) {
         const cultivation = Math.min(coopMap[i], 2); // cap cultivation bonus at 2x
-        this.food[i] = Math.min(cap, this.food[i] + t.foodRegen * 0.3 * foodMultiplier * (1 + cultivation));
+        this.food[i] = Math.min(cap, this.food[i] + t.foodRegen * 0.35 * foodMultiplier * (1 + cultivation));
       }
     }
   }
@@ -2384,6 +2384,11 @@ class Simulation {
         const crowdPenalty = (reproNeighbors - 3) * 0.12;
         const coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
         reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
+      }
+
+      // Low-population recovery: less competition = easier breeding
+      if (popSize < 150) {
+        reproChance *= 1 + (150 - popSize) / 150 * 0.5;
       }
 
       if (rng.next() > reproChance) {
