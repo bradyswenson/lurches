@@ -1346,8 +1346,22 @@ const DecisionEngine = {
         let stayChance = isCooperator
           ? Math.min(0.8, sNeighbors * 0.2)
           : Math.min(0.5, sNeighbors * 0.12); // weaker stickiness for brutes
-        // Think tank stickiness: thinkers in a think tank really want to stay
-        if (lurch.thinkTank > 0) stayChance = Math.min(0.9, stayChance + lurch.thinkTank * 2); // +0.10 to +0.30
+        // Think tank stickiness: academy members lock in place
+        if (lurch.thinkTank > 0) {
+          // Count academy size (INT lurches within radius 4)
+          let academySize = 0;
+          for (const cell of world.cellsInRadius(lurch.x, lurch.y, 4)) {
+            const m = world.getLurch(cell[0], cell[1]);
+            if (m && m.alive && m !== lurch && m.genome.intelligence >= 0.3) academySize++;
+          }
+          lurch._academySize = academySize; // cache for rendering + other systems
+          if (academySize <= 12) {
+            stayChance = 0.98; // lockdown — academy members almost never leave
+          } else {
+            // Overcrowded academy: excess members drift off to spread knowledge
+            stayChance = Math.max(0.3, 0.98 - (academySize - 12) * 0.1); // drops off sharply past 12
+          }
+        }
         if (world.rng.next() < stayChance) {
           lurch.lastAction = lurch.thinkTank > 0 ? 'thinking' : (isCooperator ? 'settled' : 'grouped');
           return { action: 'nothing' };
@@ -1575,20 +1589,23 @@ const DecisionEngine = {
     // Eat if hungry and food here
     if (lurch.hunger > 40 && world.getFood(lurch.x, lurch.y) > 1) return { action: 'eat' };
 
-    // Academy loyalty: INT lurches in a think tank stay put unless starving
+    // Academy lockdown: INT lurches in a think tank STOP. Food bonus sustains them.
     if (lurch.thinkTank > 0) {
-      if (lurch.hunger < 60) {
+      const oversize = (lurch._academySize || 0) > 12;
+      if (!oversize) {
+        // Core academy: eat, reproduce, or hold — never leave
         if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
         if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 35) return { action: 'reproduce', mate: world.rng.pick(scan.mates).lurch };
-        return { action: 'nothing' }; // hold position in academy
+        if (lurch.hunger < 75) return { action: 'nothing' }; // hold even when hungry — food will regrow
+        // Only if truly starving, forage within 2 tiles
+        const nearFood = scan.foods.filter(f => f.dist <= 2);
+        if (nearFood.length > 0) {
+          const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+          return { action: 'move', dir: [dx, dy] };
+        }
+        return { action: 'nothing' }; // even starving, try to hold
       }
-      // Hungry but in academy — forage nearby (within 3 tiles) then come back, don't wander far
-      const nearFood = scan.foods.filter(f => f.dist <= 3);
-      if (nearFood.length > 0) {
-        nearFood.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
-        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
-        return { action: 'move', dir: [dx, dy] };
-      }
+      // Oversized academy: this lurch should drift off — skip lockdown
     }
 
     // Think tank seeking: INT lurches seek other thinkers (before food-chasing)
@@ -1674,9 +1691,10 @@ const DecisionEngine = {
     // Eat strategically (wait for good food cells)
     if (lurch.hunger > 35 && world.getFood(lurch.x, lurch.y) > 2) return { action: 'eat' };
 
-    // Academy loyalty: strategic INT lurches hold position unless starving
+    // Academy lockdown: strategic INT lurches in think tank STOP
     if (lurch.thinkTank > 0) {
-      if (lurch.hunger < 55) {
+      const oversize = (lurch._academySize || 0) > 12;
+      if (!oversize) {
         if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
         if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
           scan.mates.sort((a, b) => {
@@ -1686,14 +1704,13 @@ const DecisionEngine = {
           });
           return { action: 'reproduce', mate: scan.mates[0].lurch };
         }
-        return { action: 'nothing' }; // hold position in academy
-      }
-      // Hungry but in academy — forage nearby (within 3 tiles), don't wander far
-      const nearFood = scan.foods.filter(f => f.dist <= 3);
-      if (nearFood.length > 0) {
-        nearFood.sort((a, b) => b.food / (b.dist + 1) - a.food / (a.dist + 1));
-        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
-        return { action: 'move', dir: [dx, dy] };
+        if (lurch.hunger < 75) return { action: 'nothing' };
+        const nearFood = scan.foods.filter(f => f.dist <= 2);
+        if (nearFood.length > 0) {
+          const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+          return { action: 'move', dir: [dx, dy] };
+        }
+        return { action: 'nothing' };
       }
     }
 
@@ -1821,12 +1838,12 @@ const DecisionEngine = {
       }
     }
 
-    // Academy loyalty: brilliant INT lurches in a think tank hold position unless truly hungry
+    // Academy lockdown: brilliant INT lurches in think tank STOP
     if (lurch.thinkTank > 0) {
-      if (lurch.hunger < 50) {
+      const oversize = (lurch._academySize || 0) > 12;
+      if (!oversize) {
         if (world.getFood(lurch.x, lurch.y) > 0) return { action: 'eat' };
         if (!lurch.juvenile && scan.mates.length > 0 && lurch.energy > 40) {
-          // Pick optimal mate even while holding academy
           const scored = scan.mates.map(m => {
             let score = 0;
             for (const g of GENES) score += m.lurch.genome[g];
@@ -1835,14 +1852,14 @@ const DecisionEngine = {
           }).sort((a, b) => b.score - a.score);
           return { action: 'reproduce', mate: scored[0].lurch };
         }
-        return { action: 'nothing' }; // hold position in academy
-      }
-      // Hungry but in academy — forage nearby (within 3 tiles), don't abandon the group
-      const nearFood = scan.foods.filter(f => f.dist <= 3);
-      if (nearFood.length > 0) {
-        nearFood.sort((a, b) => b.food * world.getTerrain(b.x, b.y).safety - a.food * world.getTerrain(a.x, a.y).safety);
-        const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
-        return { action: 'move', dir: [dx, dy] };
+        if (lurch.hunger < 75) return { action: 'nothing' };
+        const nearFood = scan.foods.filter(f => f.dist <= 2);
+        if (nearFood.length > 0) {
+          nearFood.sort((a, b) => b.food * world.getTerrain(b.x, b.y).safety - a.food * world.getTerrain(a.x, a.y).safety);
+          const [dx, dy] = this.directionTo(world, lurch.x, lurch.y, nearFood[0].x, nearFood[0].y);
+          return { action: 'move', dir: [dx, dy] };
+        }
+        return { action: 'nothing' };
       }
     }
 
@@ -3259,6 +3276,21 @@ class Renderer {
             const glowAlpha = lurch.taught * 0.2;
             ctx.fillStyle = `rgba(255, 220, 100, ${glowAlpha})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
+          }
+
+          // Academy glow — soft golden aura for think tank members
+          if (lurch.thinkTank > 0) {
+            const pulse = Math.sin(performance.now() / 800 + lurch.x * 0.3 + lurch.y * 0.5) * 0.3 + 0.7;
+            const glowStrength = lurch.thinkTank * 3 * pulse; // 0 to ~0.45 intensity
+            // Core glow on this cell
+            ctx.fillStyle = `rgba(255, 200, 50, ${glowStrength * 0.5})`;
+            ctx.fillRect(px, py, this.cellW, this.cellH);
+            // Soft bleed into surrounding cells (1-cell radius)
+            const bleed = glowStrength * 0.15;
+            if (bleed > 0.02) {
+              ctx.fillStyle = `rgba(255, 210, 60, ${bleed})`;
+              ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
+            }
           }
 
           ctx.globalAlpha = alpha;
