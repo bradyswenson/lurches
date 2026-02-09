@@ -38,17 +38,17 @@ A Lurch's color on the grid shows its dominant gene — the one with the highest
 
 ## Balance parameters
 
-**Combat** — Attack multiplier 30, defense multiplier 20 (1.5:1 ratio). Evasion based on INT + SPD + PER (up to ~45% dodge chance). High STR/SIZ defenders counter-strike. Fight costs 15 energy; attacker takes 18 stress.
+**Combat** — Attack multiplier 30, defense multiplier 20 (1.5:1 ratio). Evasion based on INT + SPD + PER (up to ~55% dodge chance). High STR/SIZ defenders counter-strike. Fight costs 15 energy; attacker takes 18 stress. INT lurches get solo defense from intelligence and can play dead to survive lethal hits (up to 50% chance). STR infighting kicks in when warriors dominate >25% of the population.
 
-**Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Settlement fertility bonus +25% for cooperators near cooperators.
+**Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Settlement fertility bonus +25% for cooperators near cooperators. Think tank fertility can reach +75% for the parent and +60% from the mate. Academy members strongly resist crowding penalties (85%).
 
-**Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round.
+**Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round. Academy members farm a wider area (3 tiles) with boosted food production.
 
-**Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 150 population: fertility boost (up to 2.3× at pop 30), extended mating range, reduced repro cooldown, and migration pull toward population center.
+**Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 200 population: extended mating range. Below 150: fertility boost (up to ~2.3× at pop 30), reduced repro cooldown, and migration pull toward population center. Smart parents (INT > 0.4) nurture offspring with an INT boost at birth, stronger in academies.
 
 **Stress** — INT reduces incoming stress by up to 20%. PER-heavy lurches experience crowd stress penalty.
 
-**World** — Default starting population 60. Map generation uses normalized noise for consistent terrain variety.
+**World** — Default starting population 200 at 1.6x birth rate. Map generation uses normalized noise for consistent terrain variety.
 
 ## Emergent behavior
 
@@ -56,7 +56,11 @@ The simulation produces social structures from simple rules:
 
 **Settlements** — Lurches with high INT + PER cooperate instead of fight. When they cluster together, they farm nearby tiles, defend each other (15% per ally), teach more effectively, and gain fertility bonuses. They settle in place and build self-sustaining communities.
 
-**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties.
+**Academies** — INT lurches (≥ 0.3) near other INT lurches form think tanks, visible as a golden glow. Academy members lock down — they eat, reproduce, and hold position but almost never leave. They farm wider, resist crowding, breed faster, and nurture smarter offspring. Academies cap at 12 members; overflow disperses to seed new academies. Edification slowly boosts the INT gene of nearby INT-leaning lurches, spreading intelligence through education. Children born in academies inherit significant INT boosts from smart parents.
+
+**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties. When STR dominates >25% of the population, infighting escalates — warriors turn on each other.
+
+**INT survival toolkit** — Smart lurches have layered defenses: solo defense bonus from intelligence, up to 55% evasion, death escape (playing dead to survive lethal hits), INT deterrence (looking too dangerous to attack), and a long-range beacon (up to 20 tiles) for finding other INT lurches across the map.
 
 **Companion-seeking & migration** — When food is scarce, lurches group up for survival. Smarter lurches do it sooner. At low population, all lurches feel a migration pull toward the population center — high INT and PER lurches feel it strongest, drifting together while dumb brutes mostly stumble.
 
@@ -64,7 +68,7 @@ The simulation produces social structures from simple rules:
 
 **Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, fertility spikes, and even non-cooperators develop group stickiness. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
 
-**The tension** — Settlements create food-rich territory. War bands create the force to take it. The two strategies coexist, compete, and trade dominance over thousands of rounds.
+**The tension** — Settlements create food-rich territory. War bands create the force to take it. Academies create intellectual enclaves that spread INT through education and reproduction. The three strategies coexist, compete, and trade dominance over thousands of rounds.
 
 ## God Mode
 
@@ -79,7 +83,7 @@ Press `G` to intervene. Drop meteors, trigger plagues, start ice ages, trigger a
 
 ## Architecture
 
-The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 3,500 lines of vanilla JS.
+The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 4,300 lines of vanilla JS.
 
 Deployed to [Fly.io](https://fly.io) via nginx in a Docker container.
 

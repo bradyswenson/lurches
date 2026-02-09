@@ -4145,18 +4145,20 @@ const HELP_CONTENT = {
       <tr><td><strong>Blinking</strong></td><td>Critical HP or diseased</td></tr>
       <tr><td><strong>Inverse</strong> (dark on light)</td><td>Sleeping</td></tr>
       <tr><td><strong>Small</strong></td><td>Juvenile (still growing)</td></tr>
+      <tr><td><strong style="color:#ffc832">Golden glow</strong></td><td>Think tank member (academy)</td></tr>
     </table>
     <h3>Fighting &amp; War Bands</h3>
     <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally. Kills yield modest spoils, but combat is costly — it drains energy and burns hunger. Fighters still need to eat regularly. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
-    <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~45% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression.</p>
+    <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~55% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression. INT Lurches get a solo defense bonus from pure intelligence, and can <strong>play dead</strong> to survive lethal hits (see Death Escape).</p>
     <h3>Cooperation &amp; Settlements</h3>
     <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <p>INT Lurches form a higher level of organization: <strong>academies</strong>. When think tank members cluster, they lock down, glow golden, farm wide, edify neighbors, and nurture smart offspring. Academies are self-sustaining intellectual enclaves that spread INT through both education and reproduction (see the AI &amp; Behavior tab for details).</p>
     <h3>Grouping &amp; Survival</h3>
     <p>When food is scarce, Lurches seek out companions instead of wandering randomly — smarter Lurches do this sooner. At low population (&lt;150), layered recovery mechanics activate:</p>
     <p><strong>Wider awareness</strong> — scan range extends by up to +4 cells, so scattered Lurches can detect each other across a sparse map.</p>
     <p><strong>Migration pull</strong> — Lurches drift toward the population center instead of wandering randomly. High <span style="color:#cccccc">PER</span> and <span style="color:#4488ff">INT</span> Lurches feel the pull most strongly (up to 100% bias), while even instinctive Lurches get a 30% drift. This draws survivors together over time.</p>
     <p><strong>Aggression dampening</strong> — below 100 pop, brutes become less aggressive. At 50 pop, aggression is halved. When the species is scarce, even fighters hold back.</p>
-    <p><strong>Breeding urgency</strong> — reproduction cooldown shrinks and fertility spikes at low population. Under 30 Lurches, fertility is boosted up to ~2.3×. Mating range extends from 1 to 2 cells.</p>
+    <p><strong>Breeding urgency</strong> — reproduction cooldown shrinks and fertility spikes at low population. Under 30 Lurches, fertility can be boosted up to ~2.3×. Mating range extends from 1 to 2 cells under 200 population.</p>
     <p><strong>Agriculture effect</strong> — all Lurches contribute small food regrowth to nearby cells just by being present. Cooperators contribute much more (intentional farming). Lurches in groups of 2+ also burn hunger 10–20% slower — the settled efficiency of not needing to wander. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.</p>
     <p><strong>Group stickiness</strong> — at low population, even non-cooperators stay near their group instead of wandering off. Brutes get a weaker version of settlement stickiness, keeping the cluster together.</p>
     <p>These mechanics create natural boom-bust-recovery cycles rather than terminal extinction spirals.</p>
@@ -4196,11 +4198,25 @@ const HELP_CONTENT = {
     <h3>Stress</h3>
     <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>
     <h3>Think Tank</h3>
-    <p>INT Lurches (≥ 0.3) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, up to +0.15. This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. INT Lurches can sense each other from up to 12 tiles away and actively seek each other out to form academies. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
+    <p>INT Lurches (≥ 0.3) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, scaled by intelligence (up to +0.20). This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. The bonus scales with the Lurch's own INT — a genius benefits more from peers than a novice. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
     <h3>Teaching</h3>
     <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In settlements, teaching is amplified — more cooperators nearby means stronger lessons.</p>
     <h3>Discovery</h3>
     <p>A high-INT Lurch surrounded by a team (STR + SIZ + PER) can upgrade terrain: Desert → Plains/Forest, Plains → <span style="color:#ccaa33">Fertile Plains</span>, Forest → <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has higher food caps and special bonuses. Discovery costs energy — hungry Lurches don't innovate. Disasters reset enhanced terrain.</p>
+    <h3>Academies</h3>
+    <p>When INT Lurches cluster together and form think tanks, they create <strong>academies</strong> — visible as a soft golden glow. Academy members enter <strong>lockdown</strong>: they eat, reproduce, and hold position but almost never leave (98% stay chance). They forage within a tight radius when hungry instead of wandering off. Academies have a <strong>size cap of 12</strong> — once too many INT Lurches crowd a single area, stickiness drops sharply and excess members disperse to seed new academies elsewhere. Academy members farm a wider area (3 tiles vs 2), get boosted food production, strongly resist crowding penalties on reproduction, and enjoy significant fertility bonuses from the think tank.</p>
+    <h3>Edification</h3>
+    <p>Think tank members slowly and permanently uplift the <strong>intelligence gene</strong> of nearby Lurches — a cultural education effect. This only affects Lurches already leaning toward INT (it must be their top or second gene), so academies sharpen the intellectually inclined rather than converting warriors into bad scholars. Edification is capped at 0.45 — it can boost a near-INT Lurch into think tank range but can't make INT dominant on its own. That requires being born in an academy.</p>
+    <h3>INT Nurturing</h3>
+    <p>Smart parents (effective INT > 0.4) give their offspring a direct intelligence boost at birth. In an academy, the boost is even larger — children born near a think tank inherit significantly more INT. This is how academies propagate: edification draws in the willing, and nurturing breeds the next generation of thinkers.</p>
+    <h3>Death Escape</h3>
+    <p>When an INT Lurch takes a lethal hit, it can <strong>play dead</strong> — surviving at 1 HP with maximum stress. The chance scales with effective INT (up to 50%). The attacker gets their spoils and a cooldown (they think they won), while the INT Lurch flees to an adjacent cell. It's costly — the survivor is critically wounded and stressed — but alive.</p>
+    <h3>INT Beacon</h3>
+    <p>INT Lurches (≥ 0.3) can sense other INT Lurches from up to 20 tiles away — far beyond normal scan range. They prioritize moving toward established think tank clusters over lone thinkers. This long-range beacon works across all intelligence tiers, helping scattered INT Lurches find each other and form academies even on large maps.</p>
+    <h3>INT Deterrence</h3>
+    <p>Smart Lurches add their intelligence to their perceived power, making STR aggressors less likely to target them. Brutes pick on what looks weak — INT Lurches don't look weak.</p>
+    <h3>STR Infighting</h3>
+    <p>When STR becomes too dominant (> 25% of the population), aggression scales up among fighters. At 50% STR, aggression is 1.5× normal. Warriors turn on each other when there aren't enough other targets — a natural self-correcting mechanism.</p>
     <h3>Kin Warning</h3>
     <p>Smart Lurches (INT ≥ 0.6) warn nearby relatives of danger. Warned kin are more likely to flee. This creates emergent kin selection — families survive better together.</p>
   `,
