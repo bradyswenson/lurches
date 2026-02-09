@@ -4087,7 +4087,7 @@ const HELP_CONTENT = {
   overview: `
     <h3>What is Lurches?</h3>
     <p>A genetic simulation sandbox. Seed a world with creatures called <strong style="color:#ccccee">Lurches</strong>, then watch evolution unfold — or intervene as a god.</p>
-    <p>The joy is emergence: simple rules produce natural selection, cooperation, warfare, settlements, and extinction. Then you throw a meteor at it.</p>
+    <p>The joy is emergence: simple rules produce natural selection, cooperation, warfare, academies, and extinction. Then you throw a meteor at it.</p>
     <h3>How It Works</h3>
     <p>Each round, every Lurch scans its surroundings and decides what to do — eat, move, fight, cooperate, sleep, hide, reproduce, or settle. Their <strong style="color:#4488ff">intelligence</strong> determines how well they decide. Actions resolve simultaneously: fights first, then movement, eating, cooperation, reproduction, and rest.</p>
     <p>Lurches carry 7 heritable genes. Offspring get a blend of both parents plus random mutations. Over time, natural selection shapes the population. The well-adapted thrive. The rest perish.</p>
@@ -4114,7 +4114,7 @@ const HELP_CONTENT = {
     <p>High-INT Lurches surrounded by a capable team (STR + SIZ + PER neighbors, each ≥ 0.3) can <strong>discover</strong> terrain upgrades. Desert, Ruins, and Swamp upgrade to Plains or Forest. Plains upgrades to <span style="color:#ccaa33">Fertile Plains</span>. Forest upgrades to <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has 1.5× food cap (15 instead of 10) and higher regen. Discovery costs energy — hungry Lurches don't innovate. Disasters can revert enhanced terrain back to Plains. Green <span style="color:#88ffaa">✦</span> sparkles mark discoveries.</p>
     <h3>Food &amp; Cultivation</h3>
     <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
-    <p>All Lurches contribute a small food regrowth bonus to nearby cells just by being present — scattered seeds, trampled soil. Cooperator clusters contribute significantly more, creating intentional farming that makes settlements self-sustaining. Groups of 2+ also burn hunger 10–20% slower, modeling the settled efficiency of agriculture.</p>
+    <p>All Lurches contribute a small food regrowth bonus to nearby cells just by being present — scattered seeds, trampled soil. Cooperator clusters contribute significantly more, creating intentional farming that sustains their communities. Groups of 2+ also burn hunger 10–20% slower, modeling the efficiency of agriculture.</p>
     <h3>Map Presets</h3>
     <p><strong>Random</strong> — procedural terrain. <strong>Pangaea</strong> — one continent. <strong>Eden</strong> — lush and abundant. <strong>The Crucible</strong> — harsh desert, tiny oasis. <strong>Archipelago</strong> — islands. <strong>Ring World</strong> — habitable ring, deadly center. <strong>Waterworld</strong> — mostly ocean.</p>
   `,
@@ -4135,7 +4135,7 @@ const HELP_CONTENT = {
     <table>
       <tr><th>Symbol</th><th>Meaning</th></tr>
       <tr><td><span style="color:#ff4444">⚔</span></td><td>Kill — a Lurch died in combat</td></tr>
-      <tr><td><span style="color:#4488ff">♥</span></td><td>Cooperation — teaching, healing, or settlement activity</td></tr>
+      <tr><td><span style="color:#4488ff">♥</span></td><td>Cooperation — teaching, healing, or academy activity</td></tr>
       <tr><td><span style="color:#88ffaa">✦</span></td><td>Discovery — terrain upgraded by an INT Lurch + team</td></tr>
     </table>
     <table>
@@ -4150,9 +4150,9 @@ const HELP_CONTENT = {
     <h3>Fighting &amp; War Bands</h3>
     <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally. Kills yield modest spoils, but combat is costly — it drains energy and burns hunger. Fighters still need to eat regularly. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
     <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~55% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression. INT Lurches get a solo defense bonus from pure intelligence, and can <strong>play dead</strong> to survive lethal hits (see Death Escape).</p>
-    <h3>Cooperation &amp; Settlements</h3>
-    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
-    <p>INT Lurches form a higher level of organization: <strong>academies</strong>. When academy members cluster, they lock down, glow golden, farm wide, edify neighbors, and nurture smart offspring. Academies are self-sustaining intellectual enclaves that spread INT through both education and reproduction (see the AI &amp; Behavior tab for details).</p>
+    <h3>Cooperation &amp; Academies</h3>
+    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they gain compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <p>When INT Lurches cluster together, they form <strong>academies</strong> — a higher level of cooperation. Academy members lock down, glow golden, farm wide, edify neighbors, and nurture smart offspring. Academies are self-sustaining intellectual enclaves that spread INT through both education and reproduction (see the AI &amp; Behavior tab for details).</p>
     <h3>Grouping &amp; Survival</h3>
     <p>When food is scarce, Lurches seek out companions instead of wandering randomly — smarter Lurches do this sooner. At low population (&lt;150), layered recovery mechanics activate:</p>
     <p><strong>Wider awareness</strong> — scan range extends by up to +4 cells, so scattered Lurches can detect each other across a sparse map.</p>
@@ -4160,7 +4160,7 @@ const HELP_CONTENT = {
     <p><strong>Aggression dampening</strong> — below 100 pop, brutes become less aggressive. At 50 pop, aggression is halved. When the species is scarce, even fighters hold back.</p>
     <p><strong>Breeding urgency</strong> — reproduction cooldown shrinks and fertility spikes at low population. Under 30 Lurches, fertility can be boosted up to ~2.3×. Mating range extends from 1 to 2 cells under 200 population.</p>
     <p><strong>Agriculture effect</strong> — all Lurches contribute small food regrowth to nearby cells just by being present. Cooperators contribute much more (intentional farming). Lurches in groups of 2+ also burn hunger 10–20% slower — the settled efficiency of not needing to wander. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.</p>
-    <p><strong>Group stickiness</strong> — at low population, even non-cooperators stay near their group instead of wandering off. Brutes get a weaker version of settlement stickiness, keeping the cluster together.</p>
+    <p><strong>Group stickiness</strong> — at low population, even non-cooperators stay near their group instead of wandering off. Brutes get a weaker version of cooperative stickiness, keeping the cluster together.</p>
     <p>These mechanics create natural boom-bust-recovery cycles rather than terminal extinction spirals.</p>
     <h3>Life Cycle</h3>
     <p><strong>Bright</strong> = healthy. <strong>Dim</strong> = hungry or injured. <strong>Blinking</strong> = critical or diseased. <strong>Inverse</strong> = sleeping. Lurches die from starvation, combat, old age, disease, drowning, desert exposure, or divine smiting. Fertility tapers after 60% of max age and stops at 90% — elders teach and cooperate but breed less frequently.</p>
@@ -4196,11 +4196,11 @@ const HELP_CONTENT = {
       <tr><td style="color:#4488ff">Brilliant</td><td>0.9 – 1.0</td><td>Plans ahead. Avoids disease and desert. Territorial. Seeks optimal mates. Groups at first sign of scarcity. Strongest migration pull.</td></tr>
     </table>
     <h3>Stress</h3>
-    <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>
+    <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators resist crowding stress.</p>
     <h3>Academy Bond</h3>
     <p>INT Lurches (≥ 0.3) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, scaled by intelligence (up to +0.20). This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. The bonus scales with the Lurch's own INT — a genius benefits more from peers than a novice. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
     <h3>Teaching</h3>
-    <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In settlements, teaching is amplified — more cooperators nearby means stronger lessons.</p>
+    <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In cooperator clusters, teaching is amplified — more cooperators nearby means stronger lessons.</p>
     <h3>Discovery</h3>
     <p>A high-INT Lurch surrounded by a team (STR + SIZ + PER) can upgrade terrain: Desert → Plains/Forest, Plains → <span style="color:#ccaa33">Fertile Plains</span>, Forest → <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has higher food caps and special bonuses. Discovery costs energy — hungry Lurches don't innovate. Disasters reset enhanced terrain.</p>
     <h3>Academies</h3>
