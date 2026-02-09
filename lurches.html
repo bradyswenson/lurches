@@ -546,6 +546,9 @@
         <button class="gm-btn" data-event="iceage"><kbd>5</kbd> Ice Age</button>
         <button class="gm-btn" data-event="meteor"><kbd>6</kbd> Meteor</button>
       </div>
+      <div class="gm-row">
+        <button class="gm-btn" data-event="fertile"><kbd>9</kbd> Fertile Season</button>
+      </div>
       <div class="gm-divider"></div>
       <div class="panel-title">Biological Events</div>
       <div class="gm-row">
@@ -3253,7 +3256,7 @@ function initInput() {
     // God mode hotkeys — work anytime (don't need popover open)
     const godEvents = {
       '1': 'drought', '2': 'flood', '3': 'wildfire', '4': 'earthquake',
-      '5': 'iceage', '6': 'meteor',
+      '5': 'iceage', '6': 'meteor', '9': 'fertile',
       '7': 'plague', '8': 'mutationburst',
       'b': 'bottleneck', 'B': 'bottleneck',
       'r': 'rejuvenation', 'R': 'rejuvenation',
@@ -3626,6 +3629,7 @@ const HELP_CONTENT = {
       <tr><td><code>4</code></td><td>Earthquake</td><td>Terrain scrambled in a radius</td></tr>
       <tr><td><code>5</code></td><td>Ice Age</td><td>Global food cut, cold damage</td></tr>
       <tr><td><code>6</code></td><td>Meteor</td><td>Instant destruction in blast radius</td></tr>
+      <tr><td><code>9</code></td><td>Fertile Season</td><td>Boost food regen — helps recover from crashes</td></tr>
     </table>
     <h3>Biological Events</h3>
     <table>

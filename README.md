@@ -62,7 +62,7 @@ The simulation produces social structures from simple rules:
 
 ## God Mode
 
-Press `G` to intervene. Drop meteors, trigger plagues, start ice ages, or bless your favorite Lurch. The severity slider goes from "gentle nudge" (1) to "apocalyptic" (10).
+Press `G` to intervene. Drop meteors, trigger plagues, start ice ages, trigger a fertile season to help a struggling population recover, or bless your favorite Lurch. The severity slider goes from "gentle nudge" (1) to "apocalyptic" (10).
 
 ## Deeper reading
 
