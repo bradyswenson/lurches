@@ -60,7 +60,7 @@ The simulation produces social structures from simple rules:
 
 **Academies** — INT lurches (≥ 0.3) near other INT lurches form academies, visible as a golden glow. Academy members lock down — they eat, reproduce, and hold position but almost never leave. They farm wider, resist crowding, breed faster, and nurture smarter offspring. Academies cap at 12 members; overflow disperses to seed new academies. Edification slowly boosts the INT gene of nearby INT-leaning lurches, spreading intelligence through education. Children born in academies inherit significant INT boosts from smart parents.
 
-**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties. When STR dominates >25% of the population, infighting escalates — warriors turn on each other.
+**War bands** — Lurches with high STR + SIZ are aggressive. When brutes cluster near other brutes, they get a pack bonus: more damage per ally, bigger spoils from kills. Counter-strikes trigger when defenders are sufficiently strong. They naturally form raiding parties. When STR dominates >25% of the population, infighting escalates — warriors turn on each other. Killers glow red for 3 days and kills leave lingering blood stains on the ground — visible even at max speed.
 
 **INT survival toolkit** — Smart lurches have layered defenses: solo defense bonus from intelligence, up to 55% evasion, death escape (playing dead to survive lethal hits), INT deterrence (looking too dangerous to attack), and a long-range beacon (up to 20 tiles) for finding other INT lurches across the map.
 
