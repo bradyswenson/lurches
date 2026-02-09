@@ -1146,16 +1146,25 @@ const Genetics = {
     const expected = 1 / GENES.length; // ~0.143 for 7 genes
     for (const g of GENES) {
       let w = rng.range(0.2, 0.8);
-      // Frequency-dependent inheritance: rare traits blend toward stronger parent
+      // Frequency-dependent inheritance: rare traits boosted, dominant traits penalized
       if (traitFreq) {
         const freq = traitFreq[g] || 0;
         if (freq < expected) {
-          const rarityBoost = ((expected - freq) / expected) * 0.15;
-          // Shift weight toward whichever parent has higher value for this gene
+          // Rarity boost: underrepresented genes inherit stronger
+          const rarityBoost = ((expected - freq) / expected) * 0.25;
           if (genomeA[g] >= genomeB[g]) {
             w = Math.min(0.95, w + rarityBoost);
           } else {
             w = Math.max(0.05, w - rarityBoost);
+          }
+        } else if (freq > expected * 2) {
+          // Dominance penalty: overrepresented genes regress toward mean
+          const dominancePenalty = Math.min(0.2, (freq - expected * 2) * 0.5);
+          // Blend toward LOWER parent value (regression)
+          if (genomeA[g] >= genomeB[g]) {
+            w = Math.max(0.05, w - dominancePenalty);
+          } else {
+            w = Math.min(0.95, w + dominancePenalty);
           }
         }
       }
@@ -1182,6 +1191,13 @@ const Genetics = {
 
   reproduce(parentA, parentB, rng, traitFreq) {
     const blended = Genetics.crossover(parentA.genome, parentB.genome, rng, traitFreq);
+    // Cultural inheritance: taught parents or teachers pass stronger INT to offspring
+    const teacherBoost = Math.max(parentA.taught || 0, parentB.taught || 0);
+    const parentINT = Math.max(parentA.genome.intelligence, parentB.genome.intelligence);
+    if (teacherBoost > 0 || parentINT > 0.5) {
+      const culturalBoost = Math.max(teacherBoost * 0.15, (parentINT - 0.5) * 0.1);
+      blended.intelligence = Math.min(1, blended.intelligence + culturalBoost);
+    }
     const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
     return mutated;
   }
