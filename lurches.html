@@ -799,7 +799,7 @@ const CONFIG = {
   energyPerRound: -0.5,
   sleepEnergyGain: 15,
   eatHungerReduce: 25,
-  fightEnergyCost: 15,
+  fightEnergyCost: 20,
   reproduceEnergyCost: 20,
   hideEnergyCost: 2,
   juvenileDuration: 10,
@@ -1260,25 +1260,28 @@ const Genetics = {
     return child;
   },
 
-  mutate(genome, rate, rng) {
+  mutate(genome, rate, rng, burstMult = 1) {
     const result = { ...genome };
+    // During mutation burst: wider gaussian variance + higher macro chance
+    const variance = 0.08 * (1 + (burstMult - 1) * 0.3); // 0.08 normal → ~0.10 sev5 → ~0.32 sev10
+    const macroChance = CONFIG.macroMutationChance * burstMult; // 2% normal → 12% sev5 → 22% sev10
     for (const g of GENES) {
       // Normal mutation
       if (rng.next() < rate) {
-        result[g] += rng.gaussian(0, 0.08);
+        result[g] += rng.gaussian(0, variance);
       }
-      // Macro-mutation
-      if (rng.next() < CONFIG.macroMutationChance) {
-        result[g] = rng.next(); // completely random new value
+      // Macro-mutation (complete random reset of this gene)
+      if (rng.next() < macroChance) {
+        result[g] = rng.next();
       }
       result[g] = Math.max(0, Math.min(1, result[g]));
     }
     return result;
   },
 
-  reproduce(parentA, parentB, rng, traitFreq) {
+  reproduce(parentA, parentB, rng, traitFreq, mutRate, burstMult) {
     const blended = Genetics.crossover(parentA.genome, parentB.genome, rng, traitFreq);
-    const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
+    const mutated = Genetics.mutate(blended, mutRate || CONFIG.mutationRate, rng, burstMult || 1);
     return mutated;
   }
 };
@@ -2121,7 +2124,8 @@ const Events = {
     const dur = this.sevInt(30);
     const mult = 1 + this._severity * 1.0; // sev1=2x, sev5=6x, sev10=11x
     this.add({ name: 'Mutation Burst', duration: dur, mutMult: mult });
-    sim.log(`MUTATION BURST [${this._severity}] — mutation rate ×${mult.toFixed(0)} for ${dur} rounds`, 'event');
+    const macroChance = Math.round(CONFIG.macroMutationChance * mult * 100);
+    sim.log(`MUTATION BURST [${this._severity}] — mutation rate ×${mult.toFixed(0)}, macro chance ${macroChance}% for ${dur} rounds`, 'event');
   },
 
 
@@ -2424,6 +2428,7 @@ class Simulation {
       if (!target || !target.alive) continue;
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
+      lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 5); // combat burns calories
 
       // Evasion: smart lurches can dodge attacks entirely
       const evasionChance = target.effectiveInt * 0.25 + target.genome.speed * 0.1 + target.genome.perception * 0.1; // up to ~45% (INT+SPD+PER)
@@ -2482,10 +2487,10 @@ class Simulation {
         target.causeOfDeath = 'combat';
         world.removeLurch(target);
         this.totalDeaths++;
-        // Victor steals food — spoils scale with pack but capped
-        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.2;
-        lurch.hunger = Math.max(0, lurch.hunger - 18 * spoilsMult);
-        lurch.energy = Math.min(100, lurch.energy + 12 * spoilsMult);
+        // Victor spoils — reduced: killing feeds you a bit, not a feast
+        const spoilsMult = 1 + Math.min(packAllies, 3) * 0.15;
+        lurch.hunger = Math.max(0, lurch.hunger - 10 * spoilsMult);
+        lurch.energy = Math.min(100, lurch.energy + 6 * spoilsMult);
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
       }
       // Attacker dies from counter-strike wounds
@@ -2549,7 +2554,8 @@ class Simulation {
     const popSize = aliveForRepro.length || 1;
     for (const g of GENES) traitFreq[g] /= popSize;
 
-    const effMutRate = CONFIG.mutationRate * Events.mutationMultiplier;
+    const burstMult = Events.mutationMultiplier;
+    const effMutRate = CONFIG.mutationRate * burstMult;
     for (const { lurch, decision } of decisions) {
       if (decision.action !== 'reproduce' || !lurch.alive) continue;
       const mate = decision.mate;
@@ -2621,12 +2627,8 @@ class Simulation {
       const cell = world.emptyAdjacent(lurch.x, lurch.y) || world.emptyAdjacent(mate.x, mate.y);
       if (!cell) { lurch.lastAction = 'repro-no-room'; continue; }
 
-      // Create offspring
-      const childGenome = Genetics.reproduce(lurch, mate, rng, traitFreq);
-      // Apply mutation multiplier
-      const finalGenome = Events.mutationMultiplier > 1
-        ? Genetics.mutate(childGenome, effMutRate, rng)
-        : childGenome;
+      // Create offspring (mutation burst scales variance + macro chance inside reproduce)
+      const finalGenome = Genetics.reproduce(lurch, mate, rng, traitFreq, effMutRate, burstMult);
 
       const child = new Lurch(nextLurchId++, cell[0], cell[1], finalGenome, lurch.id, mate.id);
       child.birthRound = this.round;
@@ -3841,7 +3843,7 @@ const HELP_CONTENT = {
       <tr><td><strong>Small</strong></td><td>Juvenile (still growing)</td></tr>
     </table>
     <h3>Fighting &amp; War Bands</h3>
-    <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors for food and energy. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally, and bigger spoils from kills. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
+    <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally. Kills yield modest spoils, but combat is costly — it drains energy and burns hunger. Fighters still need to eat regularly. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
     <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~45% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression.</p>
     <h3>Cooperation &amp; Settlements</h3>
     <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they form <strong>settlements</strong> with compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Settled cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
@@ -3914,7 +3916,7 @@ const HELP_CONTENT = {
     <table>
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
       <tr><td><code>7</code></td><td>Plague</td><td>Disease spreads from patient zero</td></tr>
-      <tr><td><code>8</code></td><td>Mutation Burst</td><td>Mutation rate spikes — wild offspring</td></tr>
+      <tr><td><code>8</code></td><td>Mutation Burst</td><td>Mutation rate, variance, and macro-mutation chance all spike — disrupts dominant traits with wild offspring</td></tr>
       <tr><td><code>B</code></td><td>Cull</td><td>Kill 50% randomly</td></tr>
       <tr><td><code>R</code></td><td>Rejuvenation</td><td>Heal and refresh all Lurches</td></tr>
     </table>
