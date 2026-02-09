@@ -2624,7 +2624,7 @@ class Simulation {
       const charge = crisis * crisis * 0.32;
       this._recoveryEnergy = Math.max(this._recoveryEnergy, charge);
     }
-    this._recoveryEnergy *= 0.92; // decay 8% per tick — burst fades over ~30 ticks
+    this._recoveryEnergy *= 0.85; // decay 15% per tick — burst fades over ~15 ticks
     // Cache STR dominance fraction for aggression scaling
     let strCount = 0;
     for (const l of alive) { if (l.dominantGene === 'strength') strCount++; }
