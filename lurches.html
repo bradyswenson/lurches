@@ -1191,11 +1191,6 @@ const Genetics = {
 
   reproduce(parentA, parentB, rng, traitFreq) {
     const blended = Genetics.crossover(parentA.genome, parentB.genome, rng, traitFreq);
-    // Cultural inheritance: taught parents nudge offspring INT slightly
-    const teacherBoost = Math.max(parentA.taught || 0, parentB.taught || 0);
-    if (teacherBoost > 0) {
-      blended.intelligence = Math.min(1, blended.intelligence + teacherBoost * 0.06);
-    }
     const mutated = Genetics.mutate(blended, CONFIG.mutationRate, rng);
     return mutated;
   }
@@ -2322,10 +2317,8 @@ class Simulation {
       const food = world.getFood(lurch.x, lurch.y);
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
-      // Smart foraging: INT lurches are inherently better at extracting nutrition
-      const smartForage = 1 + lurch.effectiveInt * 0.15; // up to +15% from INT alone
-      // Teaching bonus: taught lurches extract even more nutrition from food
-      const teachBonus = smartForage + lurch.taught * 0.4; // teaching adds up to +40%
+      // Teaching bonus: taught lurches extract more nutrition from food
+      const teachBonus = 1 + lurch.taught * 0.3; // up to +30% from teaching
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
       lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
       lurch.energy = Math.min(100, lurch.energy + eatAmount * 2 * teachBonus);
