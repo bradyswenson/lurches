@@ -2317,8 +2317,9 @@ class Simulation {
       const food = world.getFood(lurch.x, lurch.y);
       const eatAmount = Math.min(food, 3 + lurch.genome.size * 2);
       world.setFood(lurch.x, lurch.y, food - eatAmount);
-      // Teaching bonus: taught lurches extract more nutrition from food
-      const teachBonus = 1 + lurch.taught * 0.3; // up to +30% from teaching
+      // Smart foraging: small personal INT bonus + teaching community bonus
+      const smartForage = lurch.effectiveInt * 0.1; // up to +10% from INT alone
+      const teachBonus = 1 + smartForage + lurch.taught * 0.3; // teaching adds up to +30%
       const hungerReduce = eatAmount * (CONFIG.eatHungerReduce / 3) * teachBonus;
       lurch.hunger = Math.max(0, lurch.hunger - hungerReduce);
       lurch.energy = Math.min(100, lurch.energy + eatAmount * 2 * teachBonus);
