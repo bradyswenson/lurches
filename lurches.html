@@ -556,7 +556,7 @@
 <div id="topbar">
   <div class="title" id="title-btn" style="cursor:pointer;" title="Back to home">LURCHES</div>
   <div class="stats">
-    Round: <span id="round-num">0</span> &nbsp;│&nbsp;
+    Day: <span id="round-num">0</span> &nbsp;│&nbsp;
     Pop: <span id="pop-num">0</span> &nbsp;│&nbsp;
     Births: <span id="birth-num">0</span> &nbsp;│&nbsp;
     Deaths: <span id="death-num">0</span> &nbsp;│&nbsp;
@@ -3524,7 +3524,7 @@ const ui = {
 
     // Event log
     const logHTML = sim.eventLog.slice(0, 30).map(e =>
-      `<div class="log-entry ${e.type}">[R${e.round}] ${e.msg}</div>`
+      `<div class="log-entry ${e.type}">[D${e.round}] ${e.msg}</div>`
     ).join('');
     this.logEl.innerHTML = logHTML;
 
@@ -3537,7 +3537,7 @@ const ui = {
     // Active events
     if (Events.activeEvents.length > 0) {
       this.activeEventsEl.innerHTML = Events.activeEvents.map(e =>
-        `<div style="color:#cccc44;font-size:12px;">${e.name} (${e.duration} rounds)</div>`
+        `<div style="color:#cccc44;font-size:12px;">${e.name} (${e.duration} days)</div>`
       ).join('');
     } else {
       this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
@@ -3562,7 +3562,7 @@ const ui = {
       const tlEl = document.getElementById('timeline-content');
       if (tlEl && sim.timeline.length > 0) {
         tlEl.innerHTML = sim.timeline.slice().reverse().slice(0, 50).map(t =>
-          `<div class="tl-entry ${t.category}"><span class="tl-round">R${t.round}</span><span class="tl-icon">${t.icon}</span><span class="tl-msg">${t.msg}</span></div>`
+          `<div class="tl-entry ${t.category}"><span class="tl-round">D${t.round}</span><span class="tl-icon">${t.icon}</span><span class="tl-msg">${t.msg}</span></div>`
         ).join('');
       }
     }
@@ -3687,7 +3687,7 @@ const ui = {
     </div>`;
 
     html += `<div class="stat-row"><span class="stat-label">Food</span><span class="stat-value">${food.toFixed(1)} / ${cap}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Regen</span><span class="stat-value">${t.foodRegen}/round</span></div>`;
+    html += `<div class="stat-row"><span class="stat-label">Regen</span><span class="stat-value">${t.foodRegen}/day</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Move Cost</span><span class="stat-value">${t.moveCost}</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Safety</span><span class="stat-value">${t.safety}</span></div>`;
     html += `<div class="stat-row"><span class="stat-label">Visibility</span><span class="stat-value">${t.visibility}</span></div>`;
@@ -4090,7 +4090,7 @@ const HELP_CONTENT = {
     <p>A genetic simulation sandbox. Seed a world with creatures called <strong style="color:#ccccee">Lurches</strong>, then watch evolution unfold — or intervene as a god.</p>
     <p>The joy is emergence: simple rules produce natural selection, cooperation, warfare, academies, and extinction. Then you throw a meteor at it.</p>
     <h3>How It Works</h3>
-    <p>Each round, every Lurch scans its surroundings and decides what to do — eat, move, fight, cooperate, sleep, hide, reproduce, or settle. Their <strong style="color:#4488ff">intelligence</strong> determines how well they decide. Actions resolve simultaneously: fights first, then movement, eating, cooperation, reproduction, and rest.</p>
+    <p>Each day, every Lurch scans its surroundings and decides what to do — eat, move, fight, cooperate, sleep, hide, reproduce, or settle. Their <strong style="color:#4488ff">intelligence</strong> determines how well they decide. Actions resolve simultaneously: fights first, then movement, eating, cooperation, reproduction, and rest.</p>
     <p>Lurches carry 7 heritable genes. Offspring get a blend of both parents plus random mutations. Over time, natural selection shapes the population. The well-adapted thrive. The rest perish.</p>
     <h3>Your Role</h3>
     <p>You're not trying to win. You're cultivating a world and watching consequences. Use <strong style="color:#dd66dd">God Mode</strong> to trigger droughts, meteors, plagues — or bless a favored Lurch. See what survives.</p>
@@ -4114,7 +4114,7 @@ const HELP_CONTENT = {
     <h3>Enhanced Terrain &amp; Discovery</h3>
     <p>High-INT Lurches surrounded by a capable team (STR + SIZ + PER neighbors, each ≥ 0.3) can <strong>discover</strong> terrain upgrades. Desert, Ruins, and Swamp upgrade to Plains or Forest. Plains upgrades to <span style="color:#ccaa33">Fertile Plains</span>. Forest upgrades to <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has 1.5× food cap (15 instead of 10) and higher regen. Discovery costs energy — hungry Lurches don't innovate. Disasters can revert enhanced terrain back to Plains. Green <span style="color:#88ffaa">✦</span> sparkles mark discoveries.</p>
     <h3>Food &amp; Cultivation</h3>
-    <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
+    <p>Each cell regenerates 35% of its terrain's food rate per day, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation.</p>
     <p>All Lurches contribute a small food regrowth bonus to nearby cells just by being present — scattered seeds, trampled soil. Cooperator clusters contribute significantly more, creating intentional farming that sustains their communities. Groups of 2+ also burn hunger 10–20% slower, modeling the efficiency of agriculture.</p>
     <h3>Map Presets</h3>
     <p><strong>Random</strong> — procedural terrain. <strong>Pangaea</strong> — one continent. <strong>Eden</strong> — lush and abundant. <strong>The Crucible</strong> — harsh desert, tiny oasis. <strong>Archipelago</strong> — islands. <strong>Ring World</strong> — habitable ring, deadly center. <strong>Waterworld</strong> — mostly ocean.</p>
@@ -4227,7 +4227,7 @@ const HELP_CONTENT = {
     <h3>Environmental Events</h3>
     <table>
       <tr><th>Key</th><th>Event</th><th>Effect</th></tr>
-      <tr><td><code>1</code></td><td>Drought</td><td>Slash food regen for N rounds</td></tr>
+      <tr><td><code>1</code></td><td>Drought</td><td>Slash food regen for N days</td></tr>
       <tr><td><code>2</code></td><td>Flood</td><td>Water tiles expand outward</td></tr>
       <tr><td><code>3</code></td><td>Wildfire</td><td>Forests burn to plains, spreading</td></tr>
       <tr><td><code>4</code></td><td>Earthquake</td><td>Terrain scrambled in a radius</td></tr>
@@ -4253,7 +4253,7 @@ const HELP_CONTENT = {
       <tr><th>Key</th><th>Action</th></tr>
       <tr><td><code>Space</code></td><td>Pause / Resume</td></tr>
       <tr><td><code>+ / -</code></td><td>Speed up / slow down (5 levels)</td></tr>
-      <tr><td><code>N</code></td><td>Step one round (while paused)</td></tr>
+      <tr><td><code>N</code></td><td>Step one day (while paused)</td></tr>
       <tr><td><code>G</code></td><td>Toggle God Mode</td></tr>
       <tr><td><code>?</code></td><td>Toggle this guide</td></tr>
       <tr><td><code>F</code></td><td>Follow selected Lurch</td></tr>

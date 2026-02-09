@@ -42,7 +42,7 @@ A Lurch's color on the grid shows its dominant gene — the one with the highest
 
 **Cooperation** — Cooperative defense is percentage-based (15% per ally, max 60%). Cooperator fertility bonus +25% when near other cooperators. Academy fertility can reach +75% for the parent and +60% from the mate. Academy members strongly resist crowding penalties (85%).
 
-**Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per round. Academy members farm a wider area (3 tiles) with boosted food production.
+**Food & Metabolism** — Smart (INT) and fast (SPD) foragers gain +10% food efficiency. VIT reduces hunger accumulation by 10%. Teaching grants +30% food efficiency. Food regenerates at 35% per day. Academy members farm a wider area (3 tiles) with boosted food production.
 
 **Genetics** — Fertility tapers from 60% to 90% of max age. Inheritance uses frequency-dependent selection with dominance penalty at 3x expected frequency. Below 200 population: extended mating range. Below 150: fertility boost (up to ~2.3× at pop 30), reduced repro cooldown, and migration pull toward population center. Smart parents (INT > 0.4) nurture offspring with an INT boost at birth, stronger in academies.
 
@@ -68,7 +68,7 @@ The simulation produces social structures from simple rules:
 
 **Recovery mechanics** — Below 150 population, scan range extends (up to +4 cells), aggression dampens, repro cooldowns shorten, fertility spikes, and even non-cooperators develop group stickiness. These layered safety nets create boom-bust-recovery cycles instead of terminal extinction spirals.
 
-**The tension** — Cooperators create food-rich territory. War bands create the force to take it. Academies create intellectual enclaves that spread INT through education and reproduction. The three strategies coexist, compete, and trade dominance over thousands of rounds.
+**The tension** — Cooperators create food-rich territory. War bands create the force to take it. Academies create intellectual enclaves that spread INT through education and reproduction. The three strategies coexist, compete, and trade dominance over thousands of days.
 
 ## God Mode
 
@@ -96,7 +96,7 @@ Deployed to [Fly.io](https://fly.io) via nginx in a Docker container.
 | `G` | God Mode |
 | `?` | Help guide |
 | `F` | Follow a Lurch |
-| `N` | Step one round |
+| `N` | Step one day |
 | `Arrow keys` | Scroll |
 | Click | Inspect a Lurch |
 
