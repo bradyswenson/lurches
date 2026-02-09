@@ -1189,7 +1189,7 @@ class Lurch {
 
   get effectiveInt() {
     const stressPenalty = this.stress / 100 * 0.8;
-    return Math.max(0, this.genome.intelligence - stressPenalty);
+    return Math.max(0, this.genome.intelligence + (this.thinkTank || 0) - stressPenalty);
   }
 
   // Jack of all trades, master of none: high ADP slightly suppresses other genes
@@ -2306,6 +2306,21 @@ class Simulation {
     for (const lurch of alive) {
       lurch.warned = false; // Reset warnings
       lurch.taught = 0;    // Reset teaching bonus
+      lurch.thinkTank = 0; // Reset think tank bonus
+    }
+    // Think tank: INT lurches near other INT lurches reinforce each other
+    for (const lurch of alive) {
+      if (lurch.genome.intelligence < 0.4) continue;
+      let intNeighbors = 0;
+      for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+        const other = world.getLurch(nx, ny);
+        if (other && other.alive && other.genome.intelligence >= 0.4) {
+          intNeighbors++;
+        }
+      }
+      if (intNeighbors > 0) {
+        lurch.thinkTank = Math.min(0.15, intNeighbors * 0.05); // +0.05 per INT neighbor, cap +0.15
+      }
     }
     // High-INT lurches boost neighbors — settlement amplification
     for (const lurch of alive) {
@@ -3892,6 +3907,8 @@ const HELP_CONTENT = {
     </table>
     <h3>Stress</h3>
     <p>Stress degrades effective intelligence — a brilliant Lurch at max stress behaves like an instinctive one. Stress rises from hunger, injury, crowding, and threats. It drops from eating, sleeping, safe terrain, and solitude. Cooperators in settlements resist crowding stress.</p>
+    <h3>Think Tank</h3>
+    <p>INT Lurches (≥ 0.4) near other INT Lurches reinforce each other — +0.05 effective INT per smart neighbor, up to +0.15. This boosts everything: evasion, foraging efficiency, metabolism, stress resistance, and decision quality. It's the INT mirror of war bands — brutes hit harder together, thinkers think better together.</p>
     <h3>Teaching</h3>
     <p>Lurches with INT above 0.5 teach nearby neighbors, boosting food-gathering efficiency up to 30%. Taught Lurches glow gold and are drawn to stay near teachers. In settlements, teaching is amplified — more cooperators nearby means stronger lessons.</p>
     <h3>Discovery</h3>
