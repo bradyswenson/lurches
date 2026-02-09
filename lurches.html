@@ -3310,10 +3310,10 @@ class Renderer {
             const pulse = Math.sin(performance.now() / 800 + lurch.x * 0.3 + lurch.y * 0.5) * 0.3 + 0.7;
             const glowStrength = lurch.thinkTank * 3 * pulse; // 0 to ~0.45 intensity
             // Core glow on this cell
-            ctx.fillStyle = `rgba(255, 200, 50, ${glowStrength * 0.5})`;
+            ctx.fillStyle = `rgba(255, 200, 50, ${glowStrength * 0.375})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
             // Soft bleed into surrounding cells (1-cell radius)
-            const bleed = glowStrength * 0.15;
+            const bleed = glowStrength * 0.1125;
             if (bleed > 0.02) {
               ctx.fillStyle = `rgba(255, 210, 60, ${bleed})`;
               ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
