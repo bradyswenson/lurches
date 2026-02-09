@@ -3010,7 +3010,7 @@ const ui = {
       renderer.scrollX = best.x - Math.floor(renderer.visibleCols / 2);
       renderer.scrollY = best.y - Math.floor(renderer.visibleRows / 2);
       renderer.render();
-      ui.updateTerrain(best.x, best.y);
+      ui.selectCell(best.x, best.y);
     });
   },
 
@@ -3058,11 +3058,17 @@ const ui = {
       this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
     }
 
-    // Inspector — update terrain and lurch panels for selected cell
+    // Inspector — refresh terrain (food changes) and lurch (if still selected & alive)
     if (sim.selectedCell) {
       this.updateTerrain(sim.selectedCell.x, sim.selectedCell.y);
-    } else if (sim.selectedLurch) {
-      this.updateInspector(sim.selectedLurch);
+    }
+    if (sim.selectedLurch) {
+      if (sim.selectedLurch.alive) {
+        this.updateInspector(sim.selectedLurch);
+      } else {
+        this.inspectorEl.innerHTML = '<span style="color:#555577">Lurch died</span>';
+        sim.selectedLurch = null;
+      }
     }
 
     // Timeline (update every 20 rounds to reduce DOM thrash)
@@ -3214,8 +3220,12 @@ const ui = {
     }
 
     this.terrainEl.innerHTML = html;
+  },
 
-    // Update lurch inspector
+  // Called only on click — updates lurch inspector based on who's on the cell
+  selectCell(x, y) {
+    this.updateTerrain(x, y);
+    const lurchHere = world.getLurch(x, y);
     if (lurchHere && lurchHere.alive) {
       sim.selectedLurch = lurchHere;
       this.updateInspector(lurchHere);
@@ -3458,7 +3468,7 @@ function initInput() {
     const rect = canvas.getBoundingClientRect();
     const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
     sim.selectedCell = { x: gx, y: gy };
-    ui.updateTerrain(gx, gy);
+    ui.selectCell(gx, gy);
     renderer.render();
   });
 
