@@ -2345,8 +2345,8 @@ class Simulation {
       if (lurch.energy < CONFIG.reproduceEnergyCost || lurch.hunger > 70) continue;
       if (mate.energy < CONFIG.reproduceEnergyCost * 0.5 || mate.hunger > 70) continue;
 
-      // Fertility window: full fertility until 60% of max age, tapers to zero at 80%
-      const fertileEnd = 0.8;
+      // Fertility window: full fertility until 60% of max age, tapers to zero at 90%
+      const fertileEnd = 0.9;
       const taperStart = 0.6;
       const agePctL = lurch.age / lurch.maxAge;
       const agePctM = mate.age / mate.maxAge;
@@ -2381,7 +2381,7 @@ class Simulation {
 
       // Local density penalty: crowded areas breed less (cooperators partially exempt)
       if (reproNeighbors >= 4) {
-        const crowdPenalty = (reproNeighbors - 3) * 0.15;
+        const crowdPenalty = (reproNeighbors - 3) * 0.12;
         const coopExempt = (parentCoop > 0.2 && reproCoops >= 2) ? 0.5 : 0; // settlements resist crowding
         reproChance *= Math.max(0.1, 1 - crowdPenalty * (1 - coopExempt));
       }
