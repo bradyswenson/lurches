@@ -219,6 +219,58 @@
   .gm-btn kbd { color: #dd88dd; margin-right: 4px; }
   .gm-divider { border-top: 1px solid #2a2a3a; margin: 8px 0; }
 
+  /* Confirm Modal */
+  #confirm-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 5, 12, 0.85);
+    z-index: 400;
+    align-items: center;
+    justify-content: center;
+  }
+  #confirm-overlay.visible { display: flex; }
+  #confirm-card {
+    background: #10101c;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 24px 32px;
+    max-width: 380px;
+    text-align: center;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.6);
+  }
+  #confirm-card p {
+    color: #ccccee;
+    font-size: 13px;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+  }
+  #confirm-card .confirm-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  #confirm-card .confirm-btns button {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 8px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid #3a3a5a;
+    min-width: 90px;
+  }
+  #confirm-cancel {
+    background: #1e1e2e;
+    color: #888899;
+  }
+  #confirm-cancel:hover { background: #2a2a3e; border-color: #5a5a7a; }
+  #confirm-ok {
+    background: #2a2244;
+    color: #ccaaee;
+    border-color: #6a4a8a;
+  }
+  #confirm-ok:hover { background: #3a3260; border-color: #aa66cc; }
+
   /* Setup Screen */
   #setup-screen {
     position: fixed;
@@ -622,6 +674,17 @@
   </div>
 </div>
 
+<!-- Confirm Modal -->
+<div id="confirm-overlay">
+  <div id="confirm-card">
+    <p>Return to home screen?<br><span style="color:#777788;font-size:12px;">Current simulation will be lost.</span></p>
+    <div class="confirm-btns">
+      <button id="confirm-cancel">Cancel</button>
+      <button id="confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════ -->
 <!-- HELP OVERLAY                           -->
 <!-- ═══════════════════════════════════════ -->
@@ -697,7 +760,7 @@ const TERRAIN = {
   SWAMP:       { id: 4, char: '"', name: 'Swamp',      foodRegen: 3, moveCost: 3, safety: 1, visibility: 2, color: '#5a7a3a', bgColor: '#141e0e', disease: true },
   DESERT:      { id: 5, char: '░', name: 'Desert',     foodRegen: 0, moveCost: 2, safety: 3, visibility: 5, color: '#ba8a3a', bgColor: '#1e1608' },
   SHALLOWS:    { id: 6, char: '≈', name: 'Shallows',   foodRegen: 2, moveCost: 2, safety: 3, visibility: 5, color: '#4a99aa', bgColor: '#0e1a20' },
-  RUINS:       { id: 7, char: '♠', name: 'Ruins',      foodRegen: 1, moveCost: 1, safety: 2, visibility: 2, color: '#7a5a8a', bgColor: '#14101a' },
+  RUINS:       { id: 7, char: '♠', name: 'Ruins',      foodRegen: 0, moveCost: 1, safety: 2, visibility: 2, color: '#7a5a8a', bgColor: '#14101a' },
   WALL:        { id: 8, char: '█', name: 'Wall',       foodRegen: 0, moveCost: 99, safety: 10, visibility: 0, color: '#555555', bgColor: '#222222', impassable: true },
   FERTILE_PLAINS: { id: 9,  char: '∞', name: 'Fertile Plains', foodRegen: 5, moveCost: 1, safety: 3, visibility: 5, color: '#ccaa33', bgColor: '#2a2210', enhanced: true },
   LUSH_FOREST:   { id: 10, char: '♣', name: 'Lush Forest',   foodRegen: 6, moveCost: 2, safety: 5, visibility: 2, color: '#22cc44', bgColor: '#0a2a0e', enhanced: true, shelter: true },
@@ -1942,9 +2005,10 @@ const Events = {
 
   fertile(world, sim) {
     const dur = this.sevInt(40);
-    const mult = 1 + this._severity * 0.3;
-    this.add({ name: 'Fertile Season', duration: dur, foodMult: mult });
-    sim.log(`FERTILE SEASON [${this._severity}] — food regen ×${mult.toFixed(1)} for ${dur} rounds`, 'event');
+    const foodMult = 1 + this._severity * 0.3;
+    const fertMult = 1 + this._severity * 0.2; // sev5 → 2x fertility, sev10 → 3x
+    this.add({ name: 'Fertile Season', duration: dur, foodMult, fertMult });
+    sim.log(`FERTILE SEASON [${this._severity}] — food ×${foodMult.toFixed(1)}, fertility ×${fertMult.toFixed(1)} for ${dur} rounds`, 'event');
   },
 
   plague(world, sim) {
@@ -2024,6 +2088,12 @@ const Events = {
   get foodMultiplier() {
     let m = 1;
     for (const e of this.activeEvents) { if (e.foodMult) m *= e.foodMult; }
+    return m;
+  },
+
+  get fertilityMultiplier() {
+    let m = 1;
+    for (const e of this.activeEvents) { if (e.fertMult) m *= e.fertMult; }
     return m;
   },
 
@@ -2448,6 +2518,9 @@ class Simulation {
       if (popSize < 150) {
         reproChance *= 1 + (150 - popSize) / 150 * 0.5;
       }
+
+      // Event-based fertility boost (e.g., Fertile Season)
+      reproChance *= Events.fertilityMultiplier;
 
       if (rng.next() > reproChance) {
         lurch.lastAction = 'repro-fail';
@@ -3299,6 +3372,7 @@ function initInput() {
         sim.godTool = null;
         ui.updateGodToolStatus();
         document.getElementById('help-overlay').classList.remove('visible');
+        document.getElementById('confirm-overlay').classList.remove('visible');
         break;
       case '?':
         document.getElementById('help-overlay').classList.toggle('visible');
@@ -3570,11 +3644,19 @@ document.getElementById('start-btn').addEventListener('click', () => {
   initInput();
   initHelp();
 
-  // Title click → back to home
+  // Title click → back to home (styled confirm modal)
+  const confirmOverlay = document.getElementById('confirm-overlay');
   document.getElementById('title-btn').addEventListener('click', () => {
-    if (confirm('Return to home screen? Current simulation will be lost.')) {
-      location.reload();
-    }
+    confirmOverlay.classList.add('visible');
+  });
+  document.getElementById('confirm-ok').addEventListener('click', () => {
+    location.reload();
+  });
+  document.getElementById('confirm-cancel').addEventListener('click', () => {
+    confirmOverlay.classList.remove('visible');
+  });
+  confirmOverlay.addEventListener('click', (e) => {
+    if (e.target === confirmOverlay) confirmOverlay.classList.remove('visible');
   });
 
   // Hide setup, show game
@@ -3614,8 +3696,10 @@ const HELP_CONTENT = {
       <tr><td style="color:#5a7a3a">"</td><td>Swamp</td><td>3</td><td>3</td><td>1</td><td style="color:#aa6644">Disease risk</td></tr>
       <tr><td style="color:#ba8a3a">░</td><td>Desert</td><td>0</td><td>2</td><td>3</td><td style="color:#aa6644">Drains energy</td></tr>
       <tr><td style="color:#4a99aa">≈</td><td>Shallows</td><td>2</td><td>2</td><td>3</td><td>Transition water/land</td></tr>
-      <tr><td style="color:#7a5a8a">♠</td><td>Ruins</td><td>1</td><td>1</td><td>2</td><td>Mysterious</td></tr>
+      <tr><td style="color:#7a5a8a">♠</td><td>Ruins</td><td>0</td><td>1</td><td>2</td><td>No food, low visibility</td></tr>
     </table>
+    <h3>Enhanced Terrain &amp; Discovery</h3>
+    <p>High-INT Lurches surrounded by a capable team (STR + SIZ + PER neighbors, each ≥ 0.3) can <strong>discover</strong> terrain upgrades. Desert, Ruins, and Swamp upgrade to Plains or Forest. Plains upgrades to <span style="color:#ccaa33">Fertile Plains</span>. Forest upgrades to <span style="color:#22cc44">Lush Forest</span>. Enhanced terrain has 1.5× food cap (15 instead of 10) and higher regen. Discovery costs energy — hungry Lurches don't innovate. Disasters can revert enhanced terrain back to Plains. Green <span style="color:#88ffaa">✦</span> sparkles mark discoveries.</p>
     <h3>Food &amp; Cultivation</h3>
     <p>Each cell regenerates 35% of its terrain's food rate per round, up to a cap of 10 (15 for enhanced terrain). Lurches deplete food by eating — fast foragers (SPD) and smart foragers (INT) extract more from each meal. Overpopulated areas get stripped bare, forcing migration or starvation. Cooperator clusters boost food regrowth on nearby tiles — a form of farming that makes settlements self-sustaining.</p>
     <h3>Map Presets</h3>
@@ -3633,6 +3717,21 @@ const HELP_CONTENT = {
       <tr><td><span style="color:#ffff44">@</span></td><td>Adaptability — environmental resilience</td></tr>
       <tr><td><span style="color:#cccccc">@</span></td><td>Perception — awareness, detection</td></tr>
       <tr><td><span style="color:#ffffff">@</span></td><td>Size — bulk, hit points</td></tr>
+    </table>
+    <h3>Visual Indicators</h3>
+    <table>
+      <tr><th>Symbol</th><th>Meaning</th></tr>
+      <tr><td><span style="color:#ff4444">⚔</span></td><td>Kill — a Lurch died in combat</td></tr>
+      <tr><td><span style="color:#4488ff">♥</span></td><td>Cooperation — teaching, healing, or settlement activity</td></tr>
+      <tr><td><span style="color:#88ffaa">✦</span></td><td>Discovery — terrain upgraded by an INT Lurch + team</td></tr>
+    </table>
+    <table>
+      <tr><th>Appearance</th><th>State</th></tr>
+      <tr><td><strong>Bright</strong></td><td>Healthy</td></tr>
+      <tr><td><strong>Dim</strong></td><td>Hungry or injured</td></tr>
+      <tr><td><strong>Blinking</strong></td><td>Critical HP or diseased</td></tr>
+      <tr><td><strong>Inverse</strong> (dark on light)</td><td>Sleeping</td></tr>
+      <tr><td><strong>Small</strong></td><td>Juvenile (still growing)</td></tr>
     </table>
     <h3>Fighting &amp; War Bands</h3>
     <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors for food and energy. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally, and bigger spoils from kills. Red <span style="color:#ff4444">&#x2694;</span> flashes mark kills.</p>
