@@ -2712,7 +2712,11 @@ class Simulation {
       if (nearbyCoops > 0 && lurch.hp < lurch.maxHP) {
         const healAmt = Math.min(nearbyCoops * 1.5, lurch.maxHP * 0.03); // up to 3% maxHP per round
         lurch.hp = Math.min(lurch.maxHP, lurch.hp + healAmt);
-        lurch.coopGlow = Math.max(lurch.coopGlow, 0.6); // healing triggers coop glow
+      }
+      // Cooperator among cooperators — the cooperative bond itself glows
+      if (nearbyCoops > 0) {
+        const glowLevel = Math.min(0.8, 0.35 + nearbyCoops * 0.15); // scales with ally count
+        lurch.coopGlow = Math.max(lurch.coopGlow, glowLevel);
       }
     }
 
@@ -3169,7 +3173,7 @@ class Simulation {
       if (lurch.reproCooldown > 0) lurch.reproCooldown--;
       if (lurch.combatCooldown > 0) lurch.combatCooldown--;
       if (lurch.combatGlow > 0) lurch.combatGlow *= 0.75; // decay 25% per tick, fades over ~8 ticks
-      if (lurch.coopGlow > 0) lurch.coopGlow *= 0.75; // decay 25% per tick, fades over ~8 ticks
+      if (lurch.coopGlow > 0) lurch.coopGlow *= 0.82; // decay 18% per tick, lingers ~12 ticks (matches old VFX TTL)
       if (lurch.juvenile) {
         lurch.juvenileTimer--;
         if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
@@ -3453,10 +3457,11 @@ class Renderer {
             alpha *= (0.4 + blinkPhase * 0.2 + 0.2); // dimmer — the plague drains life
           }
 
-          // Combat aura — red glow from combatGlow (decays over ~10 ticks)
+          // Combat aura — red glow from combatGlow (decays over ~8 ticks)
           if (lurch.combatGlow > 0.02) {
             const g = lurch.combatGlow;
-            const pulse = Math.sin(now / 400 + lurch.id * 1.3) * 0.25 + 0.75;
+            // Position-based pulse so clustered fighters sync up (heatmap effect)
+            const pulse = Math.sin(now / 400 + lurch.x * 0.5 + lurch.y * 0.3) * 0.25 + 0.75;
             // Core red glow
             ctx.fillStyle = `rgba(255, 10, 5, ${g * 0.65 * pulse})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
@@ -3484,12 +3489,13 @@ class Renderer {
           // Cooperation glow — blue aura from mutual aid (food sharing, healing, defense)
           if (lurch.coopGlow > 0.02) {
             const cg = lurch.coopGlow;
-            const pulse = Math.sin(now / 600 + lurch.id * 1.7) * 0.25 + 0.75;
+            // Position-based pulse so nearby cooperators sync up (heatmap effect)
+            const pulse = Math.sin(now / 600 + lurch.x * 0.3 + lurch.y * 0.5) * 0.25 + 0.75;
             // Core blue glow
-            ctx.fillStyle = `rgba(30, 100, 255, ${cg * 0.55 * pulse})`;
+            ctx.fillStyle = `rgba(30, 100, 255, ${cg * 0.8 * pulse})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
-            // Blue bleed into surrounding cells
-            const bleed = cg * 0.15 * pulse;
+            // Blue bleed — overlaps from neighbors create dense heatmap centers
+            const bleed = cg * 0.28 * pulse;
             if (bleed > 0.02) {
               ctx.fillStyle = `rgba(20, 80, 220, ${bleed})`;
               ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
