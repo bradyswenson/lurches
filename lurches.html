@@ -1151,6 +1151,7 @@ class Lurch {
     this.alive = true;
     this.causeOfDeath = null;
     this.reproCooldown = 0; // Rounds until can breed again
+    this.combatCooldown = 0; // Rounds of exhaustion after a kill
 
     // State
     this.lastAction = 'none';
@@ -1460,7 +1461,7 @@ const DecisionEngine = {
     // Low-population dampening: when everyone's scarce, even brutes hold back
     const pop = world._popCount || 200;
     if (pop < 100) aggression *= Math.max(0.3, pop / 100);
-    if (aggression > 0.1 && lurch.energy > 20) {
+    if (aggression > 0.2 && lurch.energy > 20 && lurch.combatCooldown <= 0) {
       // Look for weaker adjacent lurches to bully
       for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
         const other = world.getLurch(nx, ny);
@@ -2481,6 +2482,8 @@ class Simulation {
       if (decision.action !== 'fight' || !lurch.alive) continue;
       const target = decision.target;
       if (!target || !target.alive) continue;
+      // Combat exhaustion: can't fight while recovering from last kill
+      if (lurch.combatCooldown > 0) { lurch.lastAction = 'exhausted'; continue; }
 
       lurch.energy = Math.max(0, lurch.energy - CONFIG.fightEnergyCost);
       lurch.hunger = Math.min(CONFIG.starvationThreshold, lurch.hunger + 12); // combat burns calories
@@ -2507,6 +2510,10 @@ class Simulation {
       const packBonus = 1 + packAllies * 0.2; // each brute ally adds 20% attack
       const attackPower = (lurch.genome.strength * 0.6 + lurch.genome.size * 0.4) * lurch.specPenalty * 30 * (0.5 + rng.next() * 0.5) * packBonus;
       let defensePower = (target.genome.size * 0.5 + target.genome.strength * 0.3 + target.genome.adaptability * 0.2) * 20 + world.getTerrain(target.x, target.y).safety * 3;
+      // Academy defense: INT lurches in think tanks devise defenses (traps, weapons, tactics)
+      if (target.thinkTank > 0) {
+        defensePower *= 1 + target.thinkTank * 5; // +0.25 to +0.75 defense (1-3 INT neighbors)
+      }
 
       // Cooperative defense: nearby cooperators rally to defend
       let coopAllies = 0;
@@ -2546,6 +2553,8 @@ class Simulation {
         const spoilsMult = 1 + Math.min(packAllies, 3) * 0.08;
         lurch.hunger = Math.max(0, lurch.hunger - 8 * spoilsMult);
         lurch.energy = Math.min(100, lurch.energy + 5 * spoilsMult);
+        // Combat exhaustion: killer needs 3 rounds to recover
+        lurch.combatCooldown = 3;
         this.log(`#${target.id} killed by #${lurch.id} (age ${target.age})`, 'death');
       }
       // Attacker dies from counter-strike wounds
@@ -2806,6 +2815,7 @@ class Simulation {
       // Age
       lurch.age++;
       if (lurch.reproCooldown > 0) lurch.reproCooldown--;
+      if (lurch.combatCooldown > 0) lurch.combatCooldown--;
       if (lurch.juvenile) {
         lurch.juvenileTimer--;
         if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
