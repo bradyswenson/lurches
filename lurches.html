@@ -2618,19 +2618,13 @@ class Simulation {
 
     world._popCount = alive.length; // Cache for AI decisions
 
-    // Recovery energy: burst on crisis, decay toward baseline
-    // Charges proportional to how far below 150 we are, decays 3% per tick
-    if (alive.length < 150) {
-      const crisis = (150 - alive.length) / 150; // 0 at 150, 1 at 0
-      const charge = crisis * crisis * 0.32; // same 0.32 max as before
-      if (alive.length < 75) {
-        const c2 = (75 - alive.length) / 75;
-        this._recoveryEnergy = Math.max(this._recoveryEnergy, charge + c2 * c2 * 0.32);
-      } else {
-        this._recoveryEnergy = Math.max(this._recoveryEnergy, charge);
-      }
+    // Recovery energy: burst when pop drops below 75, decays 8% per tick
+    if (alive.length < 75) {
+      const crisis = (75 - alive.length) / 75; // 0 at 75, 1 at 0
+      const charge = crisis * crisis * 0.32;
+      this._recoveryEnergy = Math.max(this._recoveryEnergy, charge);
     }
-    this._recoveryEnergy *= 0.97; // decay 3% per tick — burst fades over ~100 ticks
+    this._recoveryEnergy *= 0.92; // decay 8% per tick — burst fades over ~30 ticks
     // Cache STR dominance fraction for aggression scaling
     let strCount = 0;
     for (const l of alive) { if (l.dominantGene === 'strength') strCount++; }
