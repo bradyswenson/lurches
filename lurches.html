@@ -1262,6 +1262,7 @@ class Lurch {
     this.causeOfDeath = null;
     this.reproCooldown = 0; // Rounds until can breed again
     this.combatCooldown = 0; // Rounds of exhaustion after a kill
+    this.combatGlow = 0; // Visual-only: red aura from recent combat, decays over ~10 ticks
 
     // State
     this.lastAction = 'none';
@@ -2848,6 +2849,8 @@ class Simulation {
         lurch.hp -= Math.max(1, Math.round(counterPower * (0.2 + rng.next() * 0.3)));
       }
       lurch.lastAction = `fight #${target.id}`;
+      lurch.combatGlow = Math.max(lurch.combatGlow, 0.7); // attacker glows
+      target.combatGlow = Math.max(target.combatGlow, 0.5); // defender glows (weaker)
       lurch.stress = Math.min(100, lurch.stress + 18);
       target.stress = Math.min(100, target.stress + 20);
       this.log(`#${lurch.id} attacked #${target.id} (${Math.round(net)} dmg)`, 'combat');
@@ -2863,6 +2866,7 @@ class Simulation {
           if (flee) { world.moveLurch(target, flee[0], flee[1]); }
           this.log(`#${target.id} escaped death! (played dead / clever escape)`, 'combat');
           lurch.lastAction = `killed? #${target.id}`;
+          lurch.combatGlow = 1.0; // attacker thinks they killed
           // Attacker thinks they won — gets spoils and cooldown
           const spoilsMult = 1 + Math.min(packAllies, 3) * 0.08;
           lurch.hunger = Math.max(0, lurch.hunger - 8 * spoilsMult);
@@ -2870,11 +2874,12 @@ class Simulation {
           lurch.combatCooldown = 3;
           continue;
         }
-        Events.addVfx('deathflash', target.x, target.y, 35);
+        Events.addVfx('deathflash', target.x, target.y, 45);
         target.alive = false;
         target.causeOfDeath = 'combat';
         world.removeLurch(target);
         this.totalDeaths++;
+        lurch.combatGlow = 1.0; // killer gets max glow
         // Victor spoils — reduced: killing feeds you a bit, not a feast
         const spoilsMult = 1 + Math.min(packAllies, 3) * 0.08;
         lurch.hunger = Math.max(0, lurch.hunger - 8 * spoilsMult);
@@ -2885,7 +2890,7 @@ class Simulation {
       }
       // Attacker dies from counter-strike wounds
       if (lurch.hp <= 0) {
-        Events.addVfx('deathflash', lurch.x, lurch.y, 35);
+        Events.addVfx('deathflash', lurch.x, lurch.y, 45);
         lurch.alive = false;
         lurch.causeOfDeath = 'combat';
         world.removeLurch(lurch);
@@ -3157,6 +3162,7 @@ class Simulation {
       lurch.age++;
       if (lurch.reproCooldown > 0) lurch.reproCooldown--;
       if (lurch.combatCooldown > 0) lurch.combatCooldown--;
+      if (lurch.combatGlow > 0) lurch.combatGlow *= 0.88; // decay ~12% per tick, fades over ~10 ticks
       if (lurch.juvenile) {
         lurch.juvenileTimer--;
         if (lurch.juvenileTimer <= 0) lurch.juvenile = false;
@@ -3365,6 +3371,7 @@ class Renderer {
 
     const halfCellW = this.cellW / 2;
     const halfCellH = this.cellH / 2;
+    const now = performance.now();
 
     for (let row = 0; row < this.visibleRows; row++) {
       for (let col = 0; col < this.visibleCols; col++) {
@@ -3439,25 +3446,19 @@ class Renderer {
             alpha *= (0.4 + blinkPhase * 0.2 + 0.2); // dimmer — the plague drains life
           }
 
-          // Combat aura — red glow on lurches that recently fought or killed
-          if (lurch.combatCooldown > 0) {
-            // Fresh kill aura: pulses red, fades with cooldown
-            const intensity = lurch.combatCooldown / 3; // 1.0 → 0.33 over 3 ticks
-            const pulse = Math.sin(now / 150 + lurch.id * 1.3) * 0.3 + 0.7;
+          // Combat aura — red glow from combatGlow (decays over ~10 ticks)
+          if (lurch.combatGlow > 0.02) {
+            const g = lurch.combatGlow;
+            const pulse = Math.sin(now / 400 + lurch.id * 1.3) * 0.25 + 0.75;
             // Core red glow
-            ctx.fillStyle = `rgba(255, 20, 10, ${intensity * 0.4 * pulse})`;
+            ctx.fillStyle = `rgba(255, 10, 5, ${g * 0.65 * pulse})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
             // Blood bleed into surrounding cells
-            const bleed = intensity * 0.12 * pulse;
+            const bleed = g * 0.2 * pulse;
             if (bleed > 0.02) {
-              ctx.fillStyle = `rgba(200, 10, 5, ${bleed})`;
+              ctx.fillStyle = `rgba(220, 5, 0, ${bleed})`;
               ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
             }
-          } else if (lurch.lastAction && lurch.lastAction.startsWith('fight')) {
-            // Active combat — lighter red flash, no bleed
-            const pulse = Math.sin(now / 100 + lurch.id) * 0.4 + 0.6;
-            ctx.fillStyle = `rgba(255, 40, 20, ${0.25 * pulse})`;
-            ctx.fillRect(px, py, this.cellW, this.cellH);
           }
 
           // Teaching glow — taught lurches get a subtle warm halo
@@ -3517,7 +3518,6 @@ class Renderer {
     }
 
     // Per-cell VFX overlay pass
-    const now = performance.now();
     for (const vfx of Events.vfx) {
       const col = vfx.x - this.scrollX;
       const row = vfx.y - this.scrollY;
@@ -3586,32 +3586,33 @@ class Renderer {
         ctx.fillText('\u2694', px + halfCellW, py + halfCellH);
         ctx.globalAlpha = 1;
       } else if (vfx.type === 'deathflash') {
-        // Bold blood splash — lingers on the ground after a kill
-        const pulse = Math.sin(now / 120 + vfx.x * 2.1) * 0.3 + 0.7;
-        // Initial bright flash, then settles into a dark blood stain
-        const flash = life > 0.8 ? (life - 0.8) / 0.2 : 0; // bright burst for first 20%
-        // Dark blood stain on the ground
-        ctx.fillStyle = `rgba(120, 5, 5, ${life * 0.55 * pulse})`;
+        // Aggressive blood splash — bright impact, lingering stain
+        const pulse = Math.sin(now / 80 + vfx.x * 2.1) * 0.25 + 0.75;
+        const flash = life > 0.75 ? (life - 0.75) / 0.25 : 0; // bright burst for first 25%
+        // Blood stain on the ground
+        ctx.fillStyle = `rgba(180, 5, 5, ${life * 0.7 * pulse})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
-        // Blood bleed into neighbors
-        if (life > 0.3) {
-          ctx.fillStyle = `rgba(80, 0, 0, ${life * 0.15})`;
+        // Blood bleed into neighbors — wider and bolder
+        if (life > 0.2) {
+          ctx.fillStyle = `rgba(120, 0, 0, ${life * 0.25})`;
           ctx.fillRect(px - this.cellW, py - this.cellH, this.cellW * 3, this.cellH * 3);
         }
-        // Bright flash on fresh kill
+        // Bright white-red flash on fresh kill — unmissable
         if (flash > 0) {
-          ctx.fillStyle = `rgba(255, 50, 20, ${flash * 0.8})`;
-          ctx.fillRect(px - 1, py - 1, this.cellW + 2, this.cellH + 2);
+          ctx.fillStyle = `rgba(255, 80, 30, ${flash * 0.95})`;
+          ctx.fillRect(px - 2, py - 2, this.cellW + 4, this.cellH + 4);
+          ctx.fillStyle = `rgba(255, 220, 180, ${flash * 0.5})`;
+          ctx.fillRect(px, py, this.cellW, this.cellH);
         }
-        // Skull marker fades in
+        // † dagger fades in
         if (life < 0.7) {
-          ctx.globalAlpha = Math.min(1, (0.7 - life) * 2) * 0.6;
-          ctx.fillStyle = '#881111';
-          ctx.fillText('\u2020', px + halfCellW, py + halfCellH); // † dagger
+          ctx.globalAlpha = Math.min(1, (0.7 - life) * 2.5) * 0.75;
+          ctx.fillStyle = '#cc2222';
+          ctx.fillText('\u2020', px + halfCellW, py + halfCellH);
           ctx.globalAlpha = 1;
         }
       } else if (vfx.type === 'cooperate') {
-        const pulse = Math.sin(now / 60) * 0.5 + 0.5;
+        const pulse = Math.sin(now / 600) * 0.5 + 0.5;
         ctx.fillStyle = `rgba(30, 100, 255, ${life * 0.6 * (0.5 + pulse * 0.5)})`;
         ctx.fillRect(px, py, this.cellW, this.cellH);
         ctx.globalAlpha = life * 0.9;
@@ -3636,37 +3637,45 @@ class Renderer {
   renderLegend(ctx, now) {
     const cw = this.canvas.width;
     const items = [
-      { label: 'Wisdom',      r: 255, g: 200, b: 50,  speed: 800 },
-      { label: 'Cooperation',  r: 30,  g: 100, b: 255, speed: 600 },
-      { label: 'Combat',       r: 255, g: 20,  b: 10,  speed: 150 },
+      { label: 'Wisdom',      r: 255, g: 200, b: 50,  speed: 700 },
+      { label: 'Cooperation',  r: 30,  g: 100, b: 255, speed: 700 },
+      { label: 'Combat',       r: 255, g: 10,  b: 5,   speed: 700 },
     ];
-    const blockW = 10, blockH = 10;
-    const lineH = 16;
-    const padR = 10, padT = 8;
-    const totalH = items.length * lineH + padT;
-    const x0 = cw - padR - 90;
-    const y0 = padT;
+    const blockW = 12, blockH = 12;
+    const lineH = 20;
+    const padX = 12, padY = 12;
+    const boxW = 120, boxH = items.length * lineH + padY * 2;
+    const x0 = cw - boxW - 6;
+    const y0 = 6;
 
     ctx.save();
-    ctx.font = '10px monospace';
+
+    // Dark background panel
+    ctx.fillStyle = 'rgba(8, 8, 18, 0.82)';
+    ctx.fillRect(x0, y0, boxW, boxH);
+    ctx.strokeStyle = 'rgba(60, 60, 90, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0, y0, boxW, boxH);
+
+    ctx.font = '11px monospace';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const y = y0 + i * lineH;
-      const pulse = Math.sin(now / item.speed + i * 2.1) * 0.25 + 0.75; // 0.5 – 1.0
+      const iy = y0 + padY + i * lineH;
+      const pulse = Math.sin(now / item.speed + i * 2.1) * 0.25 + 0.75;
 
       // Pulsing color block
-      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.55 * pulse})`;
-      ctx.fillRect(x0, y, blockW, blockH);
-      // Subtle glow bleed
-      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.12 * pulse})`;
-      ctx.fillRect(x0 - 2, y - 2, blockW + 4, blockH + 4);
+      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.9 * pulse})`;
+      ctx.fillRect(x0 + padX, iy + (lineH - blockH) / 2, blockW, blockH);
+      // Soft glow around block
+      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.2 * pulse})`;
+      ctx.fillRect(x0 + padX - 3, iy + (lineH - blockH) / 2 - 3, blockW + 6, blockH + 6);
 
       // Label
-      ctx.fillStyle = `rgba(170, 170, 200, ${0.45 * pulse})`;
-      ctx.fillText(item.label, x0 + blockW + 6, y + blockH / 2);
+      ctx.fillStyle = `rgba(200, 200, 220, ${0.85})`;
+      ctx.fillText(item.label, x0 + padX + blockW + 8, iy + lineH / 2);
     }
 
     ctx.restore();
