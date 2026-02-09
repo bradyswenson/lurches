@@ -2,7 +2,7 @@
 
 A genetic simulation sandbox with an ASCII attitude
 
-_In the summer of 1992, two boys, between playing basketball and NES, wrote Pascal games on a 486 with 4 MB RAM and a dial-up modem. One of the games we wrote was Lurches, and now Claudue helped me manifest the nostalgia. Enjoy!_  
+_In the summer of 1992, two boys, between playing basketball and NES, wrote Pascal games on a 486 with 4 MB RAM and a dial-up modem. One of the games they wrote was Lurches, and now Claude helped me manifest the nostalgia. Enjoy!_  
 
 **[Play it live at lurches.net](https://lurches.net)**
 
