@@ -85,7 +85,7 @@ Press `G` to intervene. Drop meteors, trigger plagues, start ice ages, trigger a
 
 ## Architecture
 
-The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 4,400 lines of vanilla JS. Saved seeds persist in localStorage.
+The entire game is a single HTML file (`lurches.html`) — no build step, no dependencies, no framework. Canvas rendering, seeded RNG, and about 5,000 lines of vanilla JS. Saved seeds persist in localStorage.
 
 Deployed to [Fly.io](https://fly.io) via nginx in a Docker container.
 

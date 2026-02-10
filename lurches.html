@@ -21,6 +21,13 @@
     user-select: none;
   }
 
+  /* Full-height layout: sidepanel spans from topbar to window bottom */
+  #content-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
   /* Top Bar */
   #topbar {
     display: flex;
@@ -45,7 +52,7 @@
   #topbar .controls button.active { background: #3a2a2a; border-color: #aa4444; color: #ff8888; }
   #speed-display { color: #88aa88; min-width: 30px; text-align: center; }
 
-  /* Main Area */
+  /* Main Area: grid canvas fills remaining space */
   #main {
     flex: 1;
     display: flex;
@@ -68,6 +75,61 @@
     pointer-events: none;
   }
 
+  /* Floating Tooltip Inspector */
+  #lurch-tooltip {
+    display: none;
+    position: absolute;
+    z-index: 91;
+    background: rgba(12, 12, 24, 0.96);
+    border: 1px solid #3a3a5a;
+    border-radius: 4px;
+    pointer-events: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    font-size: 12px;
+  }
+  #tooltip-header {
+    display: none;
+    padding: 6px 10px;
+    background: rgba(8, 8, 16, 0.95);
+    border-bottom: 1px solid #2a2a3a;
+    border-radius: 4px 4px 0 0;
+    font-size: 13px;
+  }
+  #tooltip-body {
+    display: flex;
+    padding: 8px 10px;
+    gap: 0;
+  }
+  #tooltip-stats {
+    flex: 0 0 auto;
+    min-width: 160px;
+    padding-right: 10px;
+    border-right: 1px solid #1e1e2e;
+  }
+  #tooltip-genome {
+    flex: 0 0 auto;
+    min-width: 150px;
+    padding-left: 10px;
+    padding-top: 2px;
+  }
+  #tooltip-terrain {
+    border-top: 1px solid #1e1e2e;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .food-meter {
+    height: 6px;
+    background: #1a1a2a;
+    border-radius: 3px;
+    overflow: hidden;
+    flex: 1;
+    min-width: 40px;
+  }
+  .food-meter-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
   /* Side Panel */
   #sidepanel {
     width: 300px;
@@ -76,7 +138,7 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
   .panel-section {
     padding: 10px 12px;
@@ -122,7 +184,7 @@
   .gene-find:hover { color: #ccccee; background: #2a2a3e; }
 
   /* Timeline */
-  #timeline-section { max-height: 200px; overflow-y: auto; }
+  #timeline-section { flex: 1; overflow-y: auto; min-height: 80px; border-top: 1px solid #2a2a3a; }
   .timeline-toggle {
     cursor: pointer; display: flex; align-items: center; justify-content: space-between;
   }
@@ -137,6 +199,9 @@
   .tl-entry.godmode .tl-msg { color: #cc88cc; }
   .tl-entry.trait .tl-msg { color: #88cccc; }
   .tl-entry.milestone .tl-msg { color: #cccc66; }
+  .tl-entry.legend .tl-msg { color: #ffaa33; }
+  .tl-entry.discovery .tl-msg { color: #44ccaa; }
+  .tl-entry[data-lurch-id]:hover { background: rgba(255, 170, 50, 0.1); }
 
   /* Bottom Bar */
   #bottombar {
@@ -678,10 +743,19 @@
   </div>
 </div>
 
+<div id="content-area">
 <div id="main">
   <div id="grid-container">
     <canvas id="grid-canvas"></canvas>
     <div id="grid-overlay"></div>
+    <div id="lurch-tooltip">
+      <div id="tooltip-header"></div>
+      <div id="tooltip-body">
+        <div id="tooltip-stats"></div>
+        <div id="tooltip-genome"></div>
+      </div>
+      <div id="tooltip-terrain"></div>
+    </div>
     <div id="god-tool-status" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(20,20,32,0.9);border:1px solid #aa44aa;padding:6px 16px;border-radius:4px;color:#dd88dd;font-size:12px;z-index:90;pointer-events:none;letter-spacing:1px;"></div>
     <div id="godmode-panel">
       <h2>⚡ GOD MODE ⚡</h2>
@@ -732,20 +806,9 @@
       </div>
     </div>
   </div>
+</div>
 
   <div id="sidepanel">
-    <div class="panel-section" id="terrain-panel">
-      <div class="panel-title">Terrain</div>
-      <div id="terrain-content" style="color:#555577;font-size:12px;">
-        Click any cell to inspect
-      </div>
-    </div>
-    <div class="panel-section" id="inspector-panel">
-      <div class="panel-title">Lurch Inspector</div>
-      <div id="inspector-content" style="color:#555577;font-size:12px;">
-        Click a Lurch on the grid to inspect
-      </div>
-    </div>
     <div class="panel-section">
       <div class="panel-title">Population</div>
       <canvas id="sparkline-canvas" height="40"></canvas>
@@ -919,8 +982,8 @@ const CONFIG = {
   kinSimilarityThreshold: 0.7,
   maxLifespan: 200,
   baseLifespan: 80,
-  speedLevels: [500, 250, 100, 50, 20],
-  speedLabels: ['1x', '2x', '5x', '10x', 'Max'],
+  speedLevels: [500, 300, 100, 50, 20, 10, 5],
+  speedLabels: ['1x', '2x', '5x', '10x', '25x', '50x', 'Max'],
 };
 
 // ============================================================
@@ -1243,6 +1306,8 @@ class Lurch {
     this.parentA = parentA;
     this.parentB = parentB;
     this.children = [];
+    this.birthX = x; // birthplace — used for academy homecoming
+    this.birthY = y;
 
     // Derived stats
     const specPen = 1 - genome.adaptability * 0.15;
@@ -1456,20 +1521,42 @@ const DecisionEngine = {
         let stayChance = isCooperator
           ? Math.min(0.8, sNeighbors * 0.2)
           : Math.min(0.5, sNeighbors * 0.12); // weaker stickiness for brutes
-        // Think tank stickiness: academy members lock in place
+        // Think tank stickiness: based on LOCAL density, not global academy size
+        // Dense core locks down, fringe members drift — natural settlement gradient
         if (lurch.thinkTank > 0) {
-          // Count academy size (INT lurches within radius 4)
+          // Count immediate INT neighbors (8 adjacent cells)
+          let intNeighbors8 = 0;
+          for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+            const m = world.getLurch(nx, ny);
+            if (m && m.alive && m.genome.intelligence >= 0.3) intNeighbors8++;
+          }
+          // Cache academy size for rendering (wider scan)
           let academySize = 0;
           for (const cell of world.cellsInRadius(lurch.x, lurch.y, 4)) {
             const m = world.getLurch(cell[0], cell[1]);
             if (m && m.alive && m !== lurch && m.genome.intelligence >= 0.3) academySize++;
           }
-          lurch._academySize = academySize; // cache for rendering + other systems
-          if (academySize <= 12) {
-            stayChance = 0.98; // lockdown — academy members almost never leave
-          } else {
-            // Overcrowded academy: excess members drift off to spread knowledge
-            stayChance = Math.max(0.3, 0.98 - (academySize - 12) * 0.1); // drops off sharply past 12
+          lurch._academySize = academySize;
+          // Stay chance scales with local density: 0 neighbors = 0.3, 3+ = 0.98
+          stayChance = Math.min(0.98, 0.3 + intNeighbors8 * 0.23);
+        } else if (lurch.academyBorn) {
+          // Academy heir: designated stayer — near-certain lockdown near birthplace
+          const dx = Math.abs(lurch.x - lurch.birthX);
+          const dy = Math.abs(lurch.y - lurch.birthY);
+          if (Math.max(dx, dy) <= 3) {
+            stayChance = 0.95; // almost never leaves home
+          }
+        }
+        // Academy displacement: non-INT lurches feel social pressure to leave academy zones
+        if (lurch.genome.intelligence < 0.3) {
+          let intAround = 0;
+          for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+            const m = world.getLurch(nx, ny);
+            if (m && m.alive && m.genome.intelligence >= 0.3) intAround++;
+          }
+          if (intAround >= 2) {
+            // More INT neighbors = stronger pressure to leave (0.1 per INT neighbor)
+            stayChance = Math.max(0.05, stayChance - intAround * 0.1);
           }
         }
         if (world.rng.next() < stayChance) {
@@ -2481,9 +2568,12 @@ class Simulation {
     this.world = world;
     this.round = 0;
     this.paused = true;
-    this.speed = 0; // index into speedLevels
+    this.speed = 3; // index into speedLevels — default 10x (50ms)
     this.totalBirths = 0;
     this.totalDeaths = 0;
+    this.totalHeirs = 0;   // academy-born stayers designated at birth
+    this.totalBoots = 0;   // non-INT lurches displaced by academy births
+    this._birthRate = 0; // smoothed births per capita per tick (exponential moving average)
     this.eventLog = [];
     this.popHistory = [];
     this.selectedLurch = null;
@@ -2506,8 +2596,8 @@ class Simulation {
     if (this.eventLog.length > 200) this.eventLog.pop();
   }
 
-  addTimeline(icon, msg, category = 'event') {
-    this.timeline.push({ round: this.round, icon, msg, category });
+  addTimeline(icon, msg, category = 'event', lurchId = null) {
+    this.timeline.push({ round: this.round, icon, msg, category, lurchId });
   }
 
   checkMilestones(alive) {
@@ -2547,6 +2637,28 @@ class Simulation {
       this.addTimeline('🧬', `${GENE_SHORT[topTrait]} overtook ${GENE_SHORT[this._lastDominantTrait]} as dominant trait (${pct}%)`, 'trait');
     }
     this._lastDominantTrait = topTrait;
+
+    // Enhanced terrain milestones (check every 20 rounds to avoid perf hit)
+    if (this.round % 20 === 0) {
+      let fertilePlains = 0, lushForests = 0;
+      for (let y = 0; y < this.world.height; y++) {
+        for (let x = 0; x < this.world.width; x++) {
+          const t = this.world.getTerrain(x, y);
+          if (t === TERRAIN.FERTILE_PLAINS) fertilePlains++;
+          else if (t === TERRAIN.LUSH_FOREST) lushForests++;
+        }
+      }
+      const totalEnhanced = fertilePlains + lushForests;
+      if (!this._lastEnhancedMilestone) this._lastEnhancedMilestone = 0;
+      const thresholds = [5, 10, 25, 50, 100, 200];
+      for (const th of thresholds) {
+        if (totalEnhanced >= th && this._lastEnhancedMilestone < th) {
+          this.addTimeline('✦', `${totalEnhanced} enhanced tiles (${fertilePlains} fertile plains, ${lushForests} lush forests)`, 'discovery');
+          this._lastEnhancedMilestone = th;
+          break;
+        }
+      }
+    }
   }
 
   seedPopulation(preset, count) {
@@ -2970,13 +3082,15 @@ class Simulation {
       if (lurch.energy < CONFIG.reproduceEnergyCost || lurch.hunger > 70) continue;
       if (mate.energy < CONFIG.reproduceEnergyCost * 0.5 || mate.hunger > 70) continue;
 
-      // Fertility window: full fertility until 60% of max age, tapers to zero at 90%
+      // Fertility window: full fertility until taperStart of max age, tapers to zero at 90%
+      // INT extends fertile window — smarter lurches breed later into life (up to 75% vs 60%)
       const fertileEnd = 0.9;
-      const taperStart = 0.6;
+      const taperStartL = 0.6 + Math.max(lurch.effectiveInt, 0) * 0.15; // up to 0.75 at max INT
+      const taperStartM = 0.6 + Math.max(mate.effectiveInt, 0) * 0.15;
       const agePctL = lurch.age / lurch.maxAge;
       const agePctM = mate.age / mate.maxAge;
-      const fertilityL = agePctL < taperStart ? 1 : agePctL >= fertileEnd ? 0 : 1 - (agePctL - taperStart) / (fertileEnd - taperStart);
-      const fertilityM = agePctM < taperStart ? 1 : agePctM >= fertileEnd ? 0 : 1 - (agePctM - taperStart) / (fertileEnd - taperStart);
+      const fertilityL = agePctL < taperStartL ? 1 : agePctL >= fertileEnd ? 0 : 1 - (agePctL - taperStartL) / (fertileEnd - taperStartL);
+      const fertilityM = agePctM < taperStartM ? 1 : agePctM >= fertileEnd ? 0 : 1 - (agePctM - taperStartM) / (fertileEnd - taperStartM);
       if (fertilityL <= 0 || fertilityM <= 0) { lurch.lastAction = 'too-old'; continue; }
 
       // Check mating range: adjacent normally, extends to 2 at low population
@@ -3007,7 +3121,7 @@ class Simulation {
 
       // Solo INT fertility: smart lurches plan optimal timing for reproduction
       const parentInt = Math.max(lurch.effectiveInt, mate.effectiveInt);
-      reproChance *= 1 + parentInt * 0.25; // up to +25% from pure INT (works solo)
+      reproChance *= 1 + parentInt * 0.5; // up to +50% from pure INT (works solo — direct genetic advantage)
 
       // Think tank fertility: INT lurches in a think tank breed much more (civilization advantage)
       if (lurch.thinkTank > 0) {
@@ -3065,6 +3179,45 @@ class Simulation {
       child.hunger = 30;
       child.energy = 50;
 
+      // Academy birth: decide if child is a stayer (targets ~1.2 per parent)
+      // Count parent's existing children still alive and near the academy
+      const inAcademy = lurch.thinkTank > 0 || mate.thinkTank > 0;
+      if (inAcademy && child.genome.intelligence >= 0.3) {
+        let nearbyKids = 0;
+        for (const kidId of lurch.children) {
+          const kid = world.lurches.find(l => l.id === kidId);
+          if (kid && kid.alive && kid.academyBorn) {
+            const dx = Math.abs(kid.x - lurch.x);
+            const dy = Math.abs(kid.y - lurch.y);
+            if (Math.max(dx, dy) <= 4) nearbyKids++;
+          }
+        }
+        // 0 stayers nearby: 95% this one stays. 1 stayer: 25%. 2+: 5%.
+        const stayProb = nearbyKids === 0 ? 0.95 : nearbyKids === 1 ? 0.25 : 0.05;
+        if (rng.next() < stayProb) {
+          child.academyBorn = true;
+          this.totalHeirs++;
+          this.log(`Academy heir: #${child.id} designated stayer (${nearbyKids} existing heirs, ${Math.round(stayProb*100)}% chance)`, 'birth');
+          // Boot an adjacent non-INT lurch to make room for the academy heir
+          for (const [nx, ny] of world.neighbors8(lurch.x, lurch.y)) {
+            const squatter = world.getLurch(nx, ny);
+            if (squatter && squatter.alive && squatter !== mate && squatter !== child
+                && squatter.genome.intelligence < 0.3) {
+              const openCell = world.emptyAdjacent(nx, ny);
+              if (openCell) {
+                world.removeLurch(squatter);
+                squatter.x = openCell[0];
+                squatter.y = openCell[1];
+                world.placeLurch(squatter);
+                this.totalBoots++;
+                this.log(`Academy boot: #${squatter.id} displaced by heir #${child.id} (parent #${lurch.id})`, 'birth');
+              }
+              break; // boot one per birth
+            }
+          }
+        }
+      }
+
       world.lurches.push(child);
       world.placeLurch(child);
       lurch.children.push(child.id);
@@ -3085,6 +3238,19 @@ class Simulation {
       lurch.lastAction = `reproduce → #${child.id}`;
       this.totalBirths++;
       this.log(`#${lurch.id} × #${mate.id} → offspring #${child.id}`, 'birth');
+
+      // Legend detection: born with extreme traits
+      // INT requires 1.0 (academies pump them out), all others 0.99+
+      const cg = child.genome;
+      const legendTraits = [];
+      for (const gene of GENES) {
+        const threshold = gene === 'intelligence' ? 1.0 : 0.99;
+        if (cg[gene] >= threshold) legendTraits.push(GENE_SHORT[gene]);
+      }
+      if (legendTraits.length > 0) {
+        const icon = legendTraits.length > 1 ? '👑' : '🐐';
+        this.addTimeline(icon, `Legend born — #${child.id} — ${legendTraits.join(' + ')}`, 'legend', child.id);
+      }
     }
 
     // Sleep, Hide, Nothing
@@ -3285,9 +3451,14 @@ class Simulation {
       if (lurch.alive) lurch.dominantGene = lurch.getDominantGene();
     }
 
-    // Record population & check milestones
+    // Record population & update birth rate
     const aliveNow = world.lurches.filter(l => l.alive);
     const pop = aliveNow.length;
+    // Smoothed births per capita (exponential moving average, ~20 tick window)
+    const birthsThisTick = this.totalBirths - (this._prevBirths || 0);
+    this._prevBirths = this.totalBirths;
+    const rawRate = pop > 0 ? birthsThisTick / pop : 0;
+    this._birthRate = this._birthRate * 0.95 + rawRate * 0.05;
     this.popHistory.push(pop);
     if (this.popHistory.length > 500) this.popHistory.shift();
     // Check timeline milestones every 10 rounds to reduce overhead
@@ -3347,6 +3518,8 @@ class Renderer {
     this.scrollY = 0;
     this.font = '14px Menlo, Courier New, Consolas, monospace';
     this.resized = false;
+    // VFX layer toggles — all on by default
+    this.layers = { wisdom: true, cooperation: true, combat: true };
   }
 
   resize() {
@@ -3458,7 +3631,7 @@ class Renderer {
           }
 
           // Combat aura — red glow from combatGlow (decays over ~8 ticks)
-          if (lurch.combatGlow > 0.02) {
+          if (this.layers.combat && lurch.combatGlow > 0.02) {
             const g = lurch.combatGlow;
             // Position-based pulse so clustered fighters sync up (heatmap effect)
             const pulse = Math.sin(now / 400 + lurch.x * 0.5 + lurch.y * 0.3) * 0.25 + 0.75;
@@ -3474,7 +3647,7 @@ class Renderer {
           }
 
           // Teaching glow — wisdom (gold) — taught lurches get a warm halo
-          if (lurch.taught > 0) {
+          if (this.layers.wisdom && lurch.taught > 0) {
             const glowAlpha = lurch.taught * 0.25;
             ctx.fillStyle = `rgba(255, 220, 100, ${glowAlpha})`;
             ctx.fillRect(px, py, this.cellW, this.cellH);
@@ -3487,7 +3660,7 @@ class Renderer {
           }
 
           // Cooperation glow — blue aura from mutual aid (food sharing, healing, defense)
-          if (lurch.coopGlow > 0.02) {
+          if (this.layers.cooperation && lurch.coopGlow > 0.02) {
             const cg = lurch.coopGlow;
             // Position-based pulse so nearby cooperators sync up (heatmap effect)
             const pulse = Math.sin(now / 600 + lurch.x * 0.3 + lurch.y * 0.5) * 0.25 + 0.75;
@@ -3503,7 +3676,7 @@ class Renderer {
           }
 
           // Academy glow — soft golden aura for academy members
-          if (lurch.thinkTank > 0) {
+          if (this.layers.wisdom && lurch.thinkTank > 0) {
             const pulse = Math.sin(performance.now() / 800 + lurch.x * 0.3 + lurch.y * 0.5) * 0.3 + 0.7;
             const glowStrength = lurch.thinkTank * 3 * pulse; // 0 to ~0.45 intensity
             // Core glow on this cell
@@ -3652,48 +3825,98 @@ class Renderer {
   renderLegend(ctx, now) {
     const cw = this.canvas.width;
     const items = [
-      { label: 'Wisdom',      r: 255, g: 200, b: 50,  speed: 700 },
-      { label: 'Cooperation',  r: 30,  g: 100, b: 255, speed: 700 },
-      { label: 'Combat',       r: 255, g: 10,  b: 5,   speed: 700 },
+      { label: 'Wisdom',      key: 'wisdom',      r: 255, g: 200, b: 50,  speed: 700 },
+      { label: 'Cooperation', key: 'cooperation',  r: 30,  g: 100, b: 255, speed: 700 },
+      { label: 'Combat',      key: 'combat',       r: 255, g: 10,  b: 5,   speed: 700 },
     ];
-    const blockW = 12, blockH = 12;
-    const lineH = 20;
-    const padX = 12, padY = 12;
-    const boxW = 120, boxH = items.length * lineH + padY * 2;
+    const blockW = 14, blockH = 14;
+    const lineH = 22;
+    const padX = 10, padY = 10;
+    const boxW = 130, boxH = items.length * lineH + padY * 2;
     const x0 = cw - boxW - 6;
     const y0 = 6;
 
+    // Store hit regions for click detection
+    this._legendHitRegions = [];
+
     ctx.save();
 
-    // Dark background panel
-    ctx.fillStyle = 'rgba(8, 8, 18, 0.82)';
+    // Dark console panel with subtle border glow
+    ctx.fillStyle = 'rgba(6, 6, 14, 0.88)';
     ctx.fillRect(x0, y0, boxW, boxH);
-    ctx.strokeStyle = 'rgba(60, 60, 90, 0.5)';
+    ctx.strokeStyle = 'rgba(40, 45, 60, 0.7)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x0, y0, boxW, boxH);
+    // Inner bevel line (NASA console ridge)
+    ctx.strokeStyle = 'rgba(50, 55, 75, 0.3)';
+    ctx.strokeRect(x0 + 2, y0 + 2, boxW - 4, boxH - 4);
 
-    ctx.font = '11px monospace';
+    ctx.font = '10px monospace';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      const on = this.layers[item.key];
       const iy = y0 + padY + i * lineH;
-      const pulse = Math.sin(now / item.speed + i * 2.1) * 0.25 + 0.75;
+      const bx = x0 + padX;
+      const by = iy + (lineH - blockH) / 2;
 
-      // Pulsing color block
-      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.9 * pulse})`;
-      ctx.fillRect(x0 + padX, iy + (lineH - blockH) / 2, blockW, blockH);
-      // Soft glow around block
-      ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.2 * pulse})`;
-      ctx.fillRect(x0 + padX - 3, iy + (lineH - blockH) / 2 - 3, blockW + 6, blockH + 6);
+      // Store hit region
+      this._legendHitRegions.push({ x: x0, y: iy, w: boxW, h: lineH, key: item.key });
 
-      // Label
-      ctx.fillStyle = `rgba(200, 200, 220, ${0.85})`;
-      ctx.fillText(item.label, x0 + padX + blockW + 8, iy + lineH / 2);
+      if (on) {
+        // === ACTIVE — pulsing console light ===
+        const pulse = Math.sin(now / item.speed + i * 2.1) * 0.25 + 0.75;
+
+        // Outer glow halo (the "lit bulb" bleed)
+        ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.12 * pulse})`;
+        ctx.fillRect(bx - 4, by - 4, blockW + 8, blockH + 8);
+
+        // Button housing (dark inset)
+        ctx.fillStyle = 'rgba(15, 15, 25, 0.9)';
+        ctx.fillRect(bx - 1, by - 1, blockW + 2, blockH + 2);
+
+        // Pulsing lit surface
+        ctx.fillStyle = `rgba(${item.r}, ${item.g}, ${item.b}, ${0.85 * pulse})`;
+        ctx.fillRect(bx, by, blockW, blockH);
+
+        // Hot spot (brighter center dot)
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.3 * pulse})`;
+        ctx.fillRect(bx + 4, by + 4, blockW - 8, blockH - 8);
+
+        // Label — bright
+        ctx.fillStyle = `rgba(${Math.min(255, item.r + 60)}, ${Math.min(255, item.g + 60)}, ${Math.min(255, item.b + 60)}, ${0.95})`;
+        ctx.fillText(item.label, bx + blockW + 8, iy + lineH / 2);
+      } else {
+        // === OFF — dim unlit console button ===
+        // Button housing
+        ctx.fillStyle = 'rgba(15, 15, 25, 0.9)';
+        ctx.fillRect(bx - 1, by - 1, blockW + 2, blockH + 2);
+
+        // Dark unlit surface
+        ctx.fillStyle = `rgba(${Math.round(item.r * 0.15)}, ${Math.round(item.g * 0.15)}, ${Math.round(item.b * 0.15)}, 0.6)`;
+        ctx.fillRect(bx, by, blockW, blockH);
+
+        // Label — dim
+        ctx.fillStyle = 'rgba(80, 80, 100, 0.5)';
+        ctx.fillText(item.label, bx + blockW + 8, iy + lineH / 2);
+      }
     }
 
     ctx.restore();
+  }
+
+  // Check if a canvas click hits a legend toggle button
+  legendHitTest(canvasX, canvasY) {
+    if (!this._legendHitRegions) return null;
+    for (const region of this._legendHitRegions) {
+      if (canvasX >= region.x && canvasX <= region.x + region.w &&
+          canvasY >= region.y && canvasY <= region.y + region.h) {
+        return region.key;
+      }
+    }
+    return null;
   }
 
   // Convert pixel coords to grid coords
@@ -3701,6 +3924,17 @@ class Renderer {
     const col = Math.floor(px / this.cellW);
     const row = Math.floor(py / this.cellH);
     return [this.world.wrapX(col + this.scrollX), this.world.wrapY(row + this.scrollY)];
+  }
+
+  // Convert grid coords to canvas pixel coords (inverse of pixelToGrid)
+  gridToPixel(gx, gy) {
+    let col = gx - this.scrollX;
+    let row = gy - this.scrollY;
+    if (col < 0) col += this.world.w;
+    if (col >= this.world.w) col -= this.world.w;
+    if (row < 0) row += this.world.h;
+    if (row >= this.world.h) row -= this.world.h;
+    return [col * this.cellW, row * this.cellH];
   }
 }
 
@@ -3718,8 +3952,12 @@ const ui = {
     this.speedEl = document.getElementById('speed-display');
     this.pauseBtn = document.getElementById('pause-btn');
     this.logEl = document.getElementById('event-log');
-    this.inspectorEl = document.getElementById('inspector-content');
-    this.terrainEl = document.getElementById('terrain-content');
+    this.tooltipEl = document.getElementById('lurch-tooltip');
+    this.tooltipHeaderEl = document.getElementById('tooltip-header');
+    this.tooltipBodyEl = document.getElementById('tooltip-body');
+    this.tooltipStatsEl = document.getElementById('tooltip-stats');
+    this.tooltipGenomeEl = document.getElementById('tooltip-genome');
+    this.tooltipTerrainEl = document.getElementById('tooltip-terrain');
     this.sparkCanvas = document.getElementById('sparkline-canvas');
     this.sparkCtx = this.sparkCanvas.getContext('2d');
     this.traitDistEl = document.getElementById('trait-distribution');
@@ -3739,11 +3977,10 @@ const ui = {
       }
       sim.selectedLurch = best;
       sim.selectedCell = { x: best.x, y: best.y };
-      // Scroll renderer to center on this lurch
       renderer.scrollX = best.x - Math.floor(renderer.visibleCols / 2);
       renderer.scrollY = best.y - Math.floor(renderer.visibleRows / 2);
       renderer.render();
-      ui.selectCell(best.x, best.y);
+      ui.showTooltip(best.x, best.y, best);
     });
   },
 
@@ -3791,17 +4028,34 @@ const ui = {
       this.activeEventsEl.innerHTML = '<span style="color:#555577">None</span>';
     }
 
-    // Inspector — refresh terrain and lurch panels
-    if (sim.selectedLurch) {
-      if (sim.selectedLurch.alive) {
-        this.updateTerrain(sim.selectedLurch.x, sim.selectedLurch.y);
-        this.updateInspector(sim.selectedLurch);
-      } else {
-        this.inspectorEl.innerHTML = '<span style="color:#555577">Lurch died</span>';
-        sim.selectedLurch = null;
+    // Tooltip — refresh if visible
+    if (this.tooltipEl.style.display === 'block') {
+      if (sim.selectedLurch) {
+        if (sim.selectedLurch.alive) {
+          // Follow the living lurch as it moves
+          const gx = sim.selectedLurch.x;
+          const gy = sim.selectedLurch.y;
+          sim.selectedCell = { x: gx, y: gy };
+          this.showTooltip(gx, gy, sim.selectedLurch);
+        } else {
+          // Dead lurch — refresh memorial in place
+          this.tooltipHeaderEl.innerHTML = `<strong style="color:#666677">@ #${sim.selectedLurch.id}</strong><span style="color:#aa4444;font-size:11px;"> [DEAD]</span>`;
+          this.renderTooltipStats(sim.selectedLurch, sim.selectedCell ? sim.selectedCell.x : 0, sim.selectedCell ? sim.selectedCell.y : 0);
+          this.renderTooltipGenome(sim.selectedLurch);
+          if (sim.selectedCell) {
+            this.renderTooltipTerrain(sim.selectedCell.x, sim.selectedCell.y, true);
+          }
+        }
+      } else if (sim.selectedCell) {
+        // Empty cell — refresh terrain, check if a lurch arrived
+        const lurchNow = world.getLurch(sim.selectedCell.x, sim.selectedCell.y);
+        if (lurchNow && lurchNow.alive) {
+          sim.selectedLurch = lurchNow;
+          this.showTooltip(sim.selectedCell.x, sim.selectedCell.y, lurchNow);
+        } else {
+          this.renderTooltipTerrain(sim.selectedCell.x, sim.selectedCell.y, false);
+        }
       }
-    } else if (sim.selectedCell) {
-      this.updateTerrain(sim.selectedCell.x, sim.selectedCell.y);
     }
 
     // Timeline (update every 20 rounds to reduce DOM thrash)
@@ -3809,9 +4063,10 @@ const ui = {
       this._lastTimelineLen = sim.timeline.length;
       const tlEl = document.getElementById('timeline-content');
       if (tlEl && sim.timeline.length > 0) {
-        tlEl.innerHTML = sim.timeline.slice().reverse().slice(0, 50).map(t =>
-          `<div class="tl-entry ${t.category}"><span class="tl-round">D${t.round}</span><span class="tl-icon">${t.icon}</span><span class="tl-msg">${t.msg}</span></div>`
-        ).join('');
+        tlEl.innerHTML = sim.timeline.slice().reverse().slice(0, 50).map(t => {
+          const clickable = t.lurchId ? ` style="cursor:pointer;" data-lurch-id="${t.lurchId}"` : '';
+          return `<div class="tl-entry ${t.category}"${clickable}><span class="tl-round">D${t.round}</span><span class="tl-icon">${t.icon}</span><span class="tl-msg">${t.msg}</span></div>`;
+        }).join('');
       }
     }
   },
@@ -3876,100 +4131,173 @@ const ui = {
     this.traitDistEl.innerHTML = html;
   },
 
-  updateInspector(lurch) {
-    if (!lurch || !lurch.alive) {
-      this.inspectorEl.innerHTML = '<span style="color:#555577">Lurch is dead or deselected</span>';
-      sim.selectedLurch = null;
-      return;
+  // ── Tooltip rendering methods ──
+
+  // ── Tooltip: left column (lurch stats + activity) ──
+  renderTooltipStats(lurch, x, y) {
+    const dead = !lurch.alive;
+    const dim = dead ? 'opacity:0.6;' : '';
+    let html = '';
+
+    if (dead) {
+      html += `<div class="stat-row" style="${dim}"><span class="stat-label">Died</span><span class="stat-value" style="color:#aa4444;">${lurch.causeOfDeath || 'unknown'}</span></div>`;
+      html += `<div class="stat-row" style="${dim}"><span class="stat-label">Lived</span><span class="stat-value">${lurch.age} / ${Math.round(lurch.maxAge)}</span></div>`;
+    } else {
+      html += `<div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${lurch.age} / ${Math.round(lurch.maxAge)}</span></div>`;
+      html += `<div class="stat-row"><span class="stat-label">HP</span><span class="stat-value">${Math.round(lurch.hp)} / ${Math.round(lurch.maxHP)}</span></div>`;
+      html += `<div class="stat-row"><span class="stat-label">Hunger</span><span class="stat-value">${Math.round(lurch.hunger)} / ${CONFIG.starvationThreshold}</span></div>`;
+      html += `<div class="stat-row"><span class="stat-label">Stress</span><span class="stat-value">${Math.round(lurch.stress)}</span></div>`;
+      html += `<div class="stat-row"><span class="stat-label">Action</span><span class="stat-value">${lurch.lastAction}</span></div>`;
     }
 
-    let html = `<div style="color:#ccccee;font-size:13px;margin-bottom:6px;">
-      <strong style="color:${lurch.color}">@ LURCH #${lurch.id}</strong>
-      ${lurch.juvenile ? '<span style="color:#888866;font-size:11px;"> (juvenile)</span>' : ''}
-      ${lurch.diseased ? '<span style="color:#aa8800;font-size:11px;"> [DISEASED]</span>' : ''}
-    </div>`;
+    // Activity counts (2-cell radius)
+    let academy = 0, coop = 0, combat = 0;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const nx = world.wrapX(x + dx);
+        const ny = world.wrapY(y + dy);
+        const l = world.getLurch(nx, ny);
+        if (!l || !l.alive) continue;
+        if (l.thinkTank > 0) academy++;
+        if (l.coopGlow > 0.1) coop++;
+        if (l.combatGlow > 0.1) combat++;
+      }
+    }
+    if (academy > 0 || coop > 0 || combat > 0) {
+      html += `<div style="margin-top:4px;border-top:1px solid #1e1e2e;padding-top:4px;font-size:11px;">`;
+      if (academy > 0) html += `<div style="color:#ffcc33">Academy: ${academy}</div>`;
+      if (coop > 0) html += `<div style="color:#4488ff">Coop: ${coop}</div>`;
+      if (combat > 0) html += `<div style="color:#ff4444">Combat: ${combat}</div>`;
+      html += `</div>`;
+    }
 
-    html += `<div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${lurch.age} / ${Math.round(lurch.maxAge)}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">HP</span><span class="stat-value">${Math.round(lurch.hp)} / ${Math.round(lurch.maxHP)}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Hunger</span><span class="stat-value">${Math.round(lurch.hunger)} / ${CONFIG.starvationThreshold}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Energy</span><span class="stat-value">${Math.round(lurch.energy)}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Stress</span><span class="stat-value">${Math.round(lurch.stress)}</span></div>`;
+    this.tooltipStatsEl.innerHTML = html;
+  },
 
-    html += '<div style="margin:6px 0 4px;border-top:1px solid #1e1e2e;padding-top:4px;">';
+  // ── Tooltip: right column (genome bars) ──
+  renderTooltipGenome(lurch) {
+    const dead = !lurch.alive;
+    let html = '';
     for (const g of GENES) {
       const v = lurch.genome[g];
       const w = v * 100;
       html += `<div class="gene-bar">
         <span class="gene-label">${GENE_SHORT[g]}</span>
-        <div class="gene-track"><div class="gene-fill" style="width:${w}%;background:${GENE_COLORS[g]}"></div></div>
+        <div class="gene-track"><div class="gene-fill" style="width:${w}%;background:${GENE_COLORS[g]}${dead ? ';opacity:0.5' : ''}"></div></div>
         <span class="gene-val">${v.toFixed(2)}</span>
       </div>`;
     }
-    html += '</div>';
-
-    html += `<div class="stat-row"><span class="stat-label">Parents</span><span class="stat-value">${lurch.parentA ? `#${lurch.parentA} × #${lurch.parentB}` : 'Original'}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Children</span><span class="stat-value">${lurch.children.length > 0 ? lurch.children.slice(-5).map(c => '#'+c).join(', ') : 'None'}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Action</span><span class="stat-value">${lurch.lastAction}</span></div>`;
-
-    // Intelligence roles
-    const roles = [];
-    if (lurch.genome.intelligence > 0.5) roles.push('🧠 Teacher');
-    if (lurch.taught > 0) roles.push('📖 Learning');
-    if (lurch.genome.intelligence > 0.4 && lurch.genome.strength > 0.3) roles.push('💡 Discoverer');
-    if (roles.length > 0) {
-      html += `<div class="stat-row" style="margin-top:4px;"><span class="stat-label">Roles</span><span class="stat-value">${roles.join(' ')}</span></div>`;
-    }
-
-    this.inspectorEl.innerHTML = html;
+    this.tooltipGenomeEl.innerHTML = html;
   },
 
-  updateTerrain(x, y) {
+  // ── Tooltip: bottom terrain strip (compact=1 row, full=2 rows) ──
+  renderTooltipTerrain(x, y, compact) {
     const t = world.getTerrain(x, y);
     const food = world.getFood(x, y);
     const cap = t.enhanced ? CONFIG.foodCap * 1.5 : CONFIG.foodCap;
-    const lurchHere = world.getLurch(x, y);
+    const foodPct = Math.min(100, (food / cap) * 100);
+    const foodColor = foodPct > 60 ? '#44aa44' : foodPct > 30 ? '#aaaa44' : '#aa4444';
+    const enhanced = t.enhanced ? ' <span style="color:#ccaa33">(enhanced)</span>' : '';
 
-    let html = `<div style="color:#ccccee;font-size:13px;margin-bottom:6px;">
-      <strong style="color:${t.color}">${t.char}</strong> <strong>${t.name}</strong>
-      <span style="color:#555577;font-size:11px;">(${x}, ${y})</span>
-    </div>`;
-
-    html += `<div class="stat-row"><span class="stat-label">Food</span><span class="stat-value">${food.toFixed(1)} / ${cap}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Regen</span><span class="stat-value">${t.foodRegen}/day</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Move Cost</span><span class="stat-value">${t.moveCost}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Safety</span><span class="stat-value">${t.safety}</span></div>`;
-    html += `<div class="stat-row"><span class="stat-label">Visibility</span><span class="stat-value">${t.visibility}</span></div>`;
-
-    // Special properties
-    const specials = [];
-    if (t.drowning) specials.push('<span style="color:#aa6644">Drowning risk</span>');
-    if (t.disease) specials.push('<span style="color:#aa6644">Disease risk</span>');
-    if (t.shelter) specials.push('<span style="color:#22cc44">Shelter (+HP regen)</span>');
-    if (t.enhanced) specials.push('<span style="color:#ccaa33">Enhanced terrain</span>');
-    if (t.impassable) specials.push('<span style="color:#aa4444">Impassable</span>');
-    if (t === TERRAIN.DESERT) specials.push('<span style="color:#aa6644">Energy drain</span>');
-    if (specials.length > 0) {
-      html += `<div style="margin-top:4px;font-size:11px;">${specials.join(' · ')}</div>`;
+    if (compact) {
+      // Single row: terrain name + food value + food bar
+      this.tooltipTerrainEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
+        <span><strong style="color:${t.color}">${t.char}</strong> ${t.name}${enhanced}</span>
+        <span style="color:#aaaacc;white-space:nowrap;">Food: ${food.toFixed(1)}/${cap}</span>
+        <div class="food-meter"><div class="food-meter-fill" style="width:${foodPct}%;background:${foodColor}"></div></div>
+      </div>`;
+    } else {
+      // Two rows: terrain name + coords, then food value + wider food bar
+      this.tooltipTerrainEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span><strong style="color:${t.color}">${t.char}</strong> <strong>${t.name}</strong>${enhanced}</span>
+          <span style="color:#555577;font-size:10px;">(${x}, ${y})</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#aaaacc;white-space:nowrap;">Food: ${food.toFixed(1)} / ${cap}</span>
+          <div class="food-meter" style="height:8px;"><div class="food-meter-fill" style="width:${foodPct}%;background:${foodColor}"></div></div>
+        </div>`;
     }
-
-    this.terrainEl.innerHTML = html;
   },
 
-  // Called only on click — updates lurch inspector based on who's on the cell
+  positionTooltip(gx, gy) {
+    const [px, py] = renderer.gridToPixel(gx, gy);
+    const container = document.getElementById('grid-container');
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    const tooltip = this.tooltipEl;
+
+    // Show briefly off-screen to measure
+    tooltip.style.display = 'block';
+    tooltip.style.visibility = 'hidden';
+    const tW = tooltip.offsetWidth;
+    const tH = tooltip.offsetHeight;
+    tooltip.style.visibility = '';
+
+    const cellW = renderer.cellW;
+    const margin = 8;
+
+    // Default: right and aligned to cell top
+    let left = px + cellW + margin;
+    let top = py;
+
+    // Flip left if overflows right
+    if (left + tW > containerW - 4) {
+      left = px - tW - margin;
+    }
+    if (left < 4) left = 4;
+
+    // Clamp vertical
+    if (top + tH > containerH - 4) {
+      top = containerH - tH - 4;
+    }
+    if (top < 4) top = 4;
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  },
+
+  showTooltip(gx, gy, lurch) {
+    if (lurch) {
+      const dead = !lurch.alive;
+      this.tooltipHeaderEl.style.display = 'block';
+      this.tooltipHeaderEl.innerHTML = `<strong style="color:${dead ? '#666677' : lurch.color}">@ #${lurch.id}</strong>`
+        + (dead ? '<span style="color:#aa4444;font-size:11px;"> [DEAD]</span>' : '')
+        + (!dead && lurch.juvenile ? '<span style="color:#888866;font-size:11px;"> (juv)</span>' : '')
+        + (!dead && lurch.diseased ? '<span style="color:#aa8800;font-size:11px;"> [ILL]</span>' : '');
+      this.tooltipBodyEl.style.display = 'flex';
+      this.renderTooltipStats(lurch, gx, gy);
+      this.renderTooltipGenome(lurch);
+      this.renderTooltipTerrain(gx, gy, true);
+    } else {
+      this.tooltipHeaderEl.style.display = 'none';
+      this.tooltipBodyEl.style.display = 'none';
+      this.renderTooltipTerrain(gx, gy, false);
+    }
+    this.positionTooltip(gx, gy);
+  },
+
+  hideTooltip() {
+    this.tooltipEl.style.display = 'none';
+    sim.selectedLurch = null;
+    sim.selectedCell = null;
+  },
+
+  // Called only on click — shows tooltip for the clicked cell
   selectCell(x, y) {
-    this.updateTerrain(x, y);
     const lurchHere = world.getLurch(x, y);
     if (lurchHere && lurchHere.alive) {
       sim.selectedLurch = lurchHere;
-      this.updateInspector(lurchHere);
     } else {
       sim.selectedLurch = null;
-      this.inspectorEl.innerHTML = '<span style="color:#555577">No Lurch on this cell</span>';
     }
+    sim.selectedCell = { x, y };
+    this.showTooltip(x, y, lurchHere && lurchHere.alive ? lurchHere : null);
   },
 
   showGodMode() {
     sim.godMode = true;
+    this.hideTooltip();
     this.godPanel.style.display = 'block';
   },
 
@@ -4029,6 +4357,7 @@ function initInput() {
         ui.toggleGodMode();
         break;
       case 'Escape':
+        ui.hideTooltip();
         ui.hideGodMode();
         sim.godTool = null;
         ui.updateGodToolStatus();
@@ -4201,10 +4530,46 @@ function initInput() {
   canvas.addEventListener('click', (e) => {
     if (sim.godTool) return; // handled by mousedown/up
     const rect = canvas.getBoundingClientRect();
-    const [gx, gy] = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
-    sim.selectedCell = { x: gx, y: gy };
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+
+    // Check legend toggle buttons first
+    const layerHit = renderer.legendHitTest(cx, cy);
+    if (layerHit) {
+      renderer.layers[layerHit] = !renderer.layers[layerHit];
+      renderer.render();
+      return;
+    }
+
+    const [gx, gy] = renderer.pixelToGrid(cx, cy);
+
+    // Toggle: clicking same cell dismisses tooltip
+    if (sim.selectedCell && sim.selectedCell.x === gx && sim.selectedCell.y === gy
+        && ui.tooltipEl.style.display === 'block') {
+      ui.hideTooltip();
+      renderer.render();
+      return;
+    }
+
     ui.selectCell(gx, gy);
     renderer.render();
+  });
+
+  // Timeline click — select linked lurch (alive or dead memorial)
+  document.getElementById('timeline-content').addEventListener('click', (e) => {
+    const entry = e.target.closest('[data-lurch-id]');
+    if (!entry) return;
+    const id = parseInt(entry.dataset.lurchId);
+    const lurch = world.lurches.find(l => l.id === id);
+    if (!lurch) return;
+    sim.selectedLurch = lurch;
+    const gx = lurch.x;
+    const gy = lurch.y;
+    sim.selectedCell = { x: gx, y: gy };
+    renderer.scrollX = gx - Math.floor(renderer.visibleCols / 2);
+    renderer.scrollY = gy - Math.floor(renderer.visibleRows / 2);
+    renderer.render();
+    ui.showTooltip(gx, gy, lurch);
   });
 
   // Severity slider display
@@ -4315,7 +4680,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   const saveBtn = document.getElementById('confirm-save');
   document.getElementById('title-btn').addEventListener('click', () => {
     // Show current seed info
-    document.getElementById('confirm-seed-display').textContent = `Seed: ${CONFIG._currentSeed} · Map: ${CONFIG._currentMapPreset} · Lurches: ${CONFIG._currentLurchPreset}`;
+    document.getElementById('confirm-seed-display').textContent = `Seed: ${CONFIG._currentSeed}`;
     seedNameInput.value = '';
     saveBtn.disabled = true;
     confirmOverlay.classList.add('visible');
@@ -4551,7 +4916,7 @@ const HELP_CONTENT = {
       <tr><td><code>Escape</code></td><td>Close panels / deselect tool</td></tr>
     </table>
     <h3>Mouse</h3>
-    <p><strong>Click</strong> any cell to inspect its terrain — food, safety, movement cost, and special properties. If a Lurch is present, the Lurch Inspector also shows genome, stats, parents, children, and last action. In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it.</p>
+    <p><strong>Click</strong> any cell to inspect it — a floating tooltip shows terrain, food level, and a food meter. If a Lurch is present, the tooltip also shows stats, activity, and genome bars. Click the same cell again or press <code>Escape</code> to dismiss. The tooltip follows a living Lurch as it moves. In God Mode, select a tool then <strong>click or drag</strong> across the grid to paint it.</p>
     <h3>Tips</h3>
     <p>Start paused and click around to explore. Press Space to run, then watch the population sparkline and event log. When things get boring — drop a meteor.</p>
   `
