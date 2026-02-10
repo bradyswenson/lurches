@@ -373,17 +373,12 @@
   }
   #seed-name-input:focus { border-color: #44aa44; }
   #confirm-seed-display {
-    color: #555577;
+    color: #9988cc;
     font-size: 11px;
     font-family: monospace;
     margin-top: 8px;
   }
-  /* Saved seeds on setup screen */
-  .saved-seeds-list {
-    max-height: 120px;
-    overflow-y: auto;
-    margin-top: 6px;
-  }
+  /* Saved seed items (used in modal) */
   .saved-seed-item {
     display: flex;
     align-items: center;
@@ -398,7 +393,7 @@
   }
   .saved-seed-item:hover { border-color: #5555aa; background: #1a1a30; }
   .saved-seed-name {
-    color: #ccccdd;
+    color: #9988cc;
     font-size: 12px;
     flex: 1;
   }
@@ -417,6 +412,80 @@
     transition: color 0.2s;
   }
   .saved-seed-delete:hover { color: #ff4444; }
+
+  #seeds-btn {
+    display: none;
+    width: 100%;
+    margin-top: 32px;
+    background: linear-gradient(180deg, #18182a 0%, #151524 100%);
+    border: 1px solid #4a4478;
+    color: #7766aa;
+    padding: 10px 0;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 3px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #seeds-btn:hover { background: linear-gradient(180deg, #222236 0%, #1e1e30 100%); box-shadow: 0 0 16px rgba(102,85,170,0.2); }
+
+  #seeds-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 5, 12, 0.85);
+    z-index: 250;
+    align-items: center;
+    justify-content: center;
+  }
+  #seeds-overlay.visible { display: flex; }
+  #seeds-card {
+    background: #10101c;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 24px 28px;
+    width: 420px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.6);
+  }
+  #seeds-card h2 {
+    color: #9988cc;
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 0 0 16px 0;
+  }
+  #seeds-card-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 16px;
+  }
+  #seeds-card-list .saved-seed-item {
+    margin-bottom: 6px;
+  }
+  #seeds-card .seeds-empty {
+    color: #555577;
+    font-size: 12px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  #seeds-close {
+    display: block;
+    width: 100%;
+    background: #1a1a2a;
+    border: 1px solid #3a3a5a;
+    color: #8888aa;
+    padding: 8px 0;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #seeds-close:hover { background: #222236; border-color: #5a5a7a; color: #aaaacc; }
 
   /* Setup Screen */
   #setup-screen {
@@ -441,7 +510,7 @@
     text-align: center;
     margin-bottom: 24px;
     padding-bottom: 16px;
-    border-bottom: 1px solid #1e1e2e;
+    border-bottom: none;
   }
   .setup-header h1 {
     color: #ccccee;
@@ -450,7 +519,7 @@
     margin-bottom: 6px;
   }
   .setup-header .subtitle {
-    color: #555577;
+    color: #9988cc;
     font-size: 15px;
     font-style: italic;
     max-width: 320px;
@@ -458,14 +527,14 @@
     line-height: 1.4;
   }
   .setup-header .ascii-art {
-    color: #333355;
+    color: #7766aa;
     font-size: 10px;
     line-height: 1.1;
     margin-top: 10px;
     letter-spacing: 1px;
   }
   .setup-group {
-    margin-bottom: 14px;
+    margin-bottom: 25px;
   }
   .setup-group-title {
     color: #666688;
@@ -478,33 +547,177 @@
   .setup-field { flex: 1; margin-bottom: 10px; }
   .setup-field label {
     display: block;
-    color: #7777aa;
-    font-size: 11px;
-    margin-bottom: 3px;
+    color: #9988cc;
+    font-size: 13px;
+    margin-bottom: 8px;
   }
-  .setup-field select, .setup-field input {
-    background: #14142a;
-    border: 1px solid #2a2a44;
-    color: #ccccdd;
+  .setup-field input {
+    background: #12121e;
+    border: 1px solid #2a2a3a;
+    color: #9988cc;
     padding: 5px 8px;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11px;
     width: 100%;
     border-radius: 3px;
     outline: none;
     transition: border-color 0.2s;
   }
-  .setup-field select:focus, .setup-field input:focus {
-    border-color: #5555aa;
+  .setup-field input:focus {
+    border-color: #3a3a55;
   }
-  .setup-field select { cursor: pointer; }
+  /* Custom dropdown */
+  .custom-select {
+    position: relative;
+    width: 100%;
+  }
+  .custom-select-trigger {
+    background: #18182a;
+    border: 2px solid #6655aa;
+    color: #9988cc;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    width: 100%;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+  }
+  .custom-select-trigger:hover {
+    border-color: #8877cc;
+  }
+  .custom-select-trigger .arrow {
+    color: #ccccee;
+    font-size: 8px;
+    margin-left: 8px;
+  }
+  .custom-select-options {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #1a1a28;
+    border: 1px solid #2a2a44;
+    border-radius: 6px;
+    overflow: hidden;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .custom-select-options.open {
+    display: block;
+  }
+  .custom-select-option {
+    padding: 9px 14px;
+    color: #9988cc;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #222238;
+    transition: background 0.15s;
+  }
+  .custom-select-option:last-child {
+    border-bottom: none;
+  }
+  .custom-select-option:hover {
+    background: #252540;
+  }
+  .custom-select-option.selected {
+    color: #aa88ee;
+  }
+
+  /* Range slider styling — glowing purple */
+  .setup-field input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 20px;
+    background: transparent;
+    outline: none;
+    border: none;
+    margin-top: 4px;
+    box-shadow: none;
+  }
+  .setup-field input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #aa88ee;
+    border: 2px solid #8866cc;
+    cursor: pointer;
+    box-shadow: none;
+    margin-top: -8px;
+  }
+  .setup-field input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #aa88ee;
+    border: 2px solid #8866cc;
+    cursor: pointer;
+    box-shadow: none;
+  }
+  .setup-field input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: #6655aa;
+    border: none;
+    border-radius: 0;
+  }
+  .setup-field input[type="range"]::-moz-range-track {
+    height: 2px;
+    background: #6655aa;
+    border: none;
+    border-radius: 0;
+  }
+
+  .setup-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1e1e2e;
+    border: 1px solid #3a3a5a;
+    color: #666688;
+    font-size: 9px;
+    font-style: italic;
+    cursor: help;
+    position: relative;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+  .setup-info:hover { border-color: #6666aa; color: #8888bb; }
+  .setup-info .setup-tip {
+    display: none;
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #14142a;
+    border: 1px solid #3a3a5a;
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: #aaaacc;
+    font-size: 11px;
+    font-style: normal;
+    width: 220px;
+    line-height: 1.4;
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .setup-info:hover .setup-tip { display: block; }
   #start-btn {
     display: block;
     width: 100%;
-    margin-top: 6px;
-    background: linear-gradient(180deg, #1e2e1e 0%, #1a2a1a 100%);
-    border: 1px solid #44aa44;
-    color: #88ee88;
+    margin-top: 10px;
+    background: linear-gradient(180deg, #1e1e2e 0%, #1a1a2a 100%);
+    border: 1px solid #6655aa;
+    color: #aa88ee;
     padding: 10px 0;
     font-family: inherit;
     font-size: 14px;
@@ -513,7 +726,7 @@
     border-radius: 4px;
     transition: all 0.2s;
   }
-  #start-btn:hover { background: linear-gradient(180deg, #2a3e2a 0%, #243a24 100%); box-shadow: 0 0 16px rgba(68,170,68,0.2); }
+  #start-btn:hover { background: linear-gradient(180deg, #2a2a3e 0%, #242438 100%); box-shadow: 0 0 16px rgba(102,85,170,0.3); }
   .github-link:hover { color: #8888aa !important; }
 
   /* Population Sparkline */
@@ -660,78 +873,56 @@
     </div>
 
     <div class="setup-group">
-      <div class="setup-group-title">World</div>
-      <div class="setup-row">
-        <div class="setup-field">
-          <label>Map</label>
-          <select id="map-preset">
-            <option value="random" selected>Random</option>
-            <option value="pangaea">Pangaea</option>
-            <option value="eden">Eden</option>
-            <option value="crucible">The Crucible</option>
-            <option value="archipelago">Archipelago</option>
-            <option value="ringworld">Ring World</option>
-            <option value="waterworld">Waterworld</option>
-          </select>
-        </div>
-        <div class="setup-field">
-          <label>Width</label>
-          <input type="number" id="grid-w" value="80" min="20" max="200">
-        </div>
-        <div class="setup-field">
-          <label>Height</label>
-          <input type="number" id="grid-h" value="40" min="20" max="100">
+      <div class="setup-field">
+        <label>Map</label>
+        <input type="hidden" id="map-preset" value="random">
+        <div class="custom-select" id="map-select">
+          <div class="custom-select-trigger"><span id="map-select-label">Random</span><span class="arrow">&#9660;</span></div>
+          <div class="custom-select-options">
+            <div class="custom-select-option selected" data-value="random">Random</div>
+            <div class="custom-select-option" data-value="pangaea">Pangaea</div>
+            <div class="custom-select-option" data-value="eden">Eden</div>
+            <div class="custom-select-option" data-value="crucible">The Crucible</div>
+            <div class="custom-select-option" data-value="archipelago">Archipelago</div>
+            <div class="custom-select-option" data-value="ringworld">Ring World</div>
+            <div class="custom-select-option" data-value="waterworld">Waterworld</div>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="setup-group">
-      <div class="setup-group-title">Population</div>
-      <div class="setup-row">
-        <div class="setup-field">
-          <label>Species</label>
-          <select id="lurch-preset">
-            <option value="balanced">Balanced</option>
-            <option value="warriors">Warriors</option>
-            <option value="thinkers">Thinkers</option>
-            <option value="survivors">Survivors</option>
-            <option value="chaos">Chaos</option>
-            <option value="specialists">Specialists</option>
-          </select>
-        </div>
-        <div class="setup-field">
-          <label>Count</label>
-          <input type="number" id="pop-count" value="200" min="4" max="400">
-        </div>
-        <div class="setup-field">
-          <label>Mutation</label>
-          <input type="number" id="mutation-rate" value="0.05" min="0.01" max="0.2" step="0.01">
-        </div>
-      </div>
-      <div class="setup-row">
-        <div class="setup-field" style="flex:1;">
-          <label>Birth Rate: <span id="birth-rate-val">1.0x</span></label>
-          <input type="range" id="birth-rate" value="1.6" min="0.4" max="2.8" step="0.2" style="width:100%;">
-        </div>
+      <div class="setup-field" style="flex:1;">
+        <label>Birth Rate: <span id="birth-rate-val">1.0x</span>
+          <span class="setup-info">i<span class="setup-tip">How fast lurches reproduce. Higher values mean larger populations and faster evolution. Lower values create sparse, fragile worlds where every birth matters.</span></span>
+        </label>
+        <input type="range" id="birth-rate" value="1.6" min="0.4" max="2.8" step="0.2" style="width:100%;">
       </div>
     </div>
 
     <div class="setup-group">
-      <div class="setup-group-title">Seed</div>
-      <div class="setup-field" style="margin-bottom:0;">
-        <input type="text" id="rng-seed" value="" placeholder="Leave blank for random seed, or type a word / number">
+      <div class="setup-field" style="flex:1;">
+        <label>Mutation: <span id="mutation-rate-val">5%</span>
+          <span class="setup-info">i<span class="setup-tip">How much offspring genes deviate from their parents. Low mutation means stable inheritance — traits lock in. High mutation means wilder swings each generation and faster adaptation to disasters.</span></span>
+        </label>
+        <input type="range" id="mutation-rate" value="0.05" min="0.01" max="0.20" step="0.01" style="width:100%;">
       </div>
-    </div>
-
-    <div class="setup-group" id="saved-seeds-group" style="display:none;">
-      <div class="setup-group-title">Saved Seeds</div>
-      <div class="saved-seeds-list" id="saved-seeds-list"></div>
     </div>
 
     <button id="start-btn">BEGIN SIMULATION</button>
-    <a href="https://github.com/bradyswenson/lurches" target="_blank" rel="noopener" class="github-link" style="display:block;margin-top:12px;text-align:center;color:#555577;transition:color 0.2s;" title="View on GitHub">
+    <button id="seeds-btn">SAVED SEEDS</button>
+    <a href="https://github.com/bradyswenson/lurches" target="_blank" rel="noopener" class="github-link" style="display:block;margin-top:28px;text-align:center;color:#555577;transition:color 0.2s;" title="View on GitHub">
       <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
     </a>
+  </div>
+</div>
+
+<!-- Saved Seeds Modal -->
+<div id="seeds-overlay">
+  <div id="seeds-card">
+    <h2>SAVED SEEDS</h2>
+    <div id="seeds-card-list"></div>
+    <button id="seeds-close">CLOSE</button>
   </div>
 </div>
 
@@ -4722,20 +4913,46 @@ function initInput() {
 // ============================================================
 // SETUP & START
 // ============================================================
-// Birth rate slider display
+// Custom map dropdown
+(function() {
+  const sel = document.getElementById('map-select');
+  const trigger = sel.querySelector('.custom-select-trigger');
+  const opts = sel.querySelector('.custom-select-options');
+  const label = document.getElementById('map-select-label');
+  const hidden = document.getElementById('map-preset');
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    opts.classList.toggle('open');
+  });
+  sel.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      sel.querySelector('.custom-select-option.selected')?.classList.remove('selected');
+      opt.classList.add('selected');
+      label.textContent = opt.textContent;
+      hidden.value = opt.dataset.value;
+      opts.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', () => opts.classList.remove('open'));
+})();
+
+// Slider displays
 const brSlider = document.getElementById('birth-rate');
 const brVal = document.getElementById('birth-rate-val');
 brSlider.addEventListener('input', () => { brVal.textContent = (parseFloat(brSlider.value) / 1.6).toFixed(1) + 'x'; });
+const mrSlider = document.getElementById('mutation-rate');
+const mrVal = document.getElementById('mutation-rate-val');
+mrSlider.addEventListener('input', () => { mrVal.textContent = Math.round(parseFloat(mrSlider.value) * 100) + '%'; });
 
-document.getElementById('start-btn').addEventListener('click', () => {
-  const gridW = parseInt(document.getElementById('grid-w').value) || 80;
-  const gridH = parseInt(document.getElementById('grid-h').value) || 40;
-  const popCount = parseInt(document.getElementById('pop-count').value) || 40;
-  const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
-  const birthRate = (parseFloat(document.getElementById('birth-rate').value) || 1.0) / 2; // slider 1.0x = internal 0.5
-  const seedStr = document.getElementById('rng-seed').value.trim();
-  const mapPreset = document.getElementById('map-preset').value;
-  const lurchPreset = document.getElementById('lurch-preset').value;
+function launchGame(opts) {
+  const gridW = opts.gridW || 80;
+  const gridH = opts.gridH || 40;
+  const popCount = opts.popCount || 200;
+  const mutRate = opts.mutRate || 0.05;
+  const birthRate = opts.birthRate || 0.5;
+  const mapPreset = opts.mapPreset || 'random';
+  const lurchPreset = opts.lurchPreset || 'balanced';
+  const seed = opts.seed || Math.floor(Math.random() * 2147483647);
 
   CONFIG.gridW = gridW;
   CONFIG.gridH = gridH;
@@ -4743,7 +4960,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
   CONFIG.mutationRate = mutRate;
   CONFIG.birthRate = birthRate;
 
-  const seed = seedStr ? parseInt(seedStr) || hashString(seedStr) : Math.floor(Math.random() * 2147483647);
   CONFIG._currentSeed = seed;
   CONFIG._currentMapPreset = mapPreset;
   CONFIG._currentLurchPreset = lurchPreset;
@@ -4822,13 +5038,21 @@ document.getElementById('start-btn').addEventListener('click', () => {
     if (e.target === confirmOverlay) confirmOverlay.classList.remove('visible');
   });
 
-  // Hide setup, show game
+  // Hide setup & seeds modal, show game
   document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('seeds-overlay').classList.remove('visible');
 
   // Auto-start paused
   sim.log(`World seeded (seed: ${seed}). Population: ${popCount} Lurches.`, 'event');
   sim.log('Press SPACE to begin simulation.', 'event');
   ui.update();
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  const mutRate = parseFloat(document.getElementById('mutation-rate').value) || 0.05;
+  const birthRate = (parseFloat(document.getElementById('birth-rate').value) || 1.0) / 2;
+  const mapPreset = document.getElementById('map-preset').value;
+  launchGame({ mutRate, birthRate, mapPreset });
 });
 
 // ============================================================
@@ -5067,32 +5291,34 @@ function deleteSeed(index) {
 }
 function renderSavedSeeds() {
   const seeds = getSavedSeeds();
-  const group = document.getElementById('saved-seeds-group');
-  const list = document.getElementById('saved-seeds-list');
-  if (!group || !list) return;
-  if (!seeds.length) { group.style.display = 'none'; return; }
-  group.style.display = '';
+  const seedsBtn = document.getElementById('seeds-btn');
+  const list = document.getElementById('seeds-card-list');
+  // Show/hide the SAVED SEEDS button based on whether any seeds exist
+  seedsBtn.style.display = seeds.length ? 'block' : 'none';
+  if (!list) return;
+  if (!seeds.length) {
+    list.innerHTML = '<div class="seeds-empty">No saved seeds yet.<br>Play a simulation and save it from the exit screen.</div>';
+    return;
+  }
   list.innerHTML = seeds.map((s, i) => {
-    const meta = [s.mapPreset, s.lurchPreset, s.days ? `${s.days}d` : ''].filter(Boolean).join(' · ');
+    const meta = [s.mapPreset, s.days ? `${s.days}d` : ''].filter(Boolean).join(' · ');
     return `<div class="saved-seed-item" data-idx="${i}"><span class="saved-seed-name">${s.name}</span><span class="saved-seed-meta">${meta}</span><span class="saved-seed-delete" data-del="${i}" title="Delete">✕</span></div>`;
   }).join('');
-  // Click to load seed
+  // Click a seed → launch the game directly
   list.querySelectorAll('.saved-seed-item').forEach(el => {
     el.addEventListener('click', (e) => {
       if (e.target.classList.contains('saved-seed-delete')) return;
       const s = seeds[parseInt(el.dataset.idx)];
-      document.getElementById('rng-seed').value = s.seed;
-      document.getElementById('map-preset').value = s.mapPreset || 'random';
-      document.getElementById('lurch-preset').value = s.lurchPreset || 'balanced';
-      document.getElementById('grid-w').value = s.gridW || 80;
-      document.getElementById('grid-h').value = s.gridH || 40;
-      document.getElementById('pop-count').value = s.population || 200;
-      document.getElementById('mutation-rate').value = s.mutationRate || 0.05;
-      if (s.birthRate) {
-        const sliderVal = s.birthRate * 2; // internal → slider value
-        document.getElementById('birth-rate').value = sliderVal;
-        document.getElementById('birth-rate-val').textContent = (sliderVal / 1.6).toFixed(1) + 'x';
-      }
+      launchGame({
+        seed: s.seed,
+        mapPreset: s.mapPreset || 'random',
+        lurchPreset: s.lurchPreset || 'balanced',
+        mutRate: s.mutationRate || 0.05,
+        birthRate: s.birthRate || 0.5,
+        gridW: s.gridW || 80,
+        gridH: s.gridH || 40,
+        popCount: s.population || 200,
+      });
     });
   });
   // Delete buttons
@@ -5103,7 +5329,22 @@ function renderSavedSeeds() {
     });
   });
 }
-// Populate saved seeds on page load
+
+// Seeds modal: open / close handlers
+document.getElementById('seeds-btn').addEventListener('click', () => {
+  renderSavedSeeds();
+  document.getElementById('seeds-overlay').classList.add('visible');
+});
+document.getElementById('seeds-close').addEventListener('click', () => {
+  document.getElementById('seeds-overlay').classList.remove('visible');
+});
+document.getElementById('seeds-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('seeds-overlay')) {
+    document.getElementById('seeds-overlay').classList.remove('visible');
+  }
+});
+
+// Populate saved seeds on page load (shows/hides button)
 renderSavedSeeds();
 
 function hashString(str) {
