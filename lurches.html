@@ -129,6 +129,21 @@
     height: 100%;
     border-radius: 3px;
   }
+  #tooltip-death {
+    display: none;
+    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+  }
+  #tooltip-death pre {
+    margin: 0;
+    font-family: monospace;
+    line-height: 1.15;
+    color: #445;
+    text-align: center;
+    white-space: pre;
+  }
 
   /* Side Panel */
   #sidepanel {
@@ -162,7 +177,7 @@
   .gene-bar {
     display: flex;
     align-items: center;
-    margin: 2px 0;
+    margin: 6px 0;
     font-size: 11px;
   }
   .gene-label { width: 32px; color: #7777aa; }
@@ -755,6 +770,7 @@
         <div id="tooltip-genome"></div>
       </div>
       <div id="tooltip-terrain"></div>
+      <div id="tooltip-death"></div>
     </div>
     <div id="god-tool-status" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(20,20,32,0.9);border:1px solid #aa44aa;padding:6px 16px;border-radius:4px;color:#dd88dd;font-size:12px;z-index:90;pointer-events:none;letter-spacing:1px;"></div>
     <div id="godmode-panel">
@@ -810,7 +826,7 @@
 
   <div id="sidepanel">
     <div class="panel-section">
-      <div class="panel-title">Population</div>
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:baseline;">Population <span id="pop-display"></span></div>
       <canvas id="sparkline-canvas" height="40"></canvas>
     </div>
     <div class="panel-section">
@@ -949,7 +965,7 @@ const GENE_COLORS = {
   strength:     '#ff4444',
   intelligence: '#4488ff',
   adaptability: '#ffff44',
-  perception:   '#cccccc',
+  perception:   '#ff9944',
   size:         '#ffffff',
 };
 const GENE_SHORT = { vitality:'VIT', speed:'SPD', strength:'STR', intelligence:'INT', adaptability:'ADP', perception:'PER', size:'SIZ' };
@@ -3239,13 +3255,11 @@ class Simulation {
       this.totalBirths++;
       this.log(`#${lurch.id} × #${mate.id} → offspring #${child.id}`, 'birth');
 
-      // Legend detection: born with extreme traits
-      // INT requires 1.0 (academies pump them out), all others 0.99+
+      // Legend detection: born with a perfect 1.0 in any trait
       const cg = child.genome;
       const legendTraits = [];
       for (const gene of GENES) {
-        const threshold = gene === 'intelligence' ? 1.0 : 0.99;
-        if (cg[gene] >= threshold) legendTraits.push(GENE_SHORT[gene]);
+        if (cg[gene] >= 1.0) legendTraits.push(GENE_SHORT[gene]);
       }
       if (legendTraits.length > 0) {
         const icon = legendTraits.length > 1 ? '👑' : '🐐';
@@ -3958,6 +3972,9 @@ const ui = {
     this.tooltipStatsEl = document.getElementById('tooltip-stats');
     this.tooltipGenomeEl = document.getElementById('tooltip-genome');
     this.tooltipTerrainEl = document.getElementById('tooltip-terrain');
+    this.tooltipDeathEl = document.getElementById('tooltip-death');
+    this._deathAnimating = false;
+    this._lastSelectedAlive = true;
     this.sparkCanvas = document.getElementById('sparkline-canvas');
     this.sparkCtx = this.sparkCanvas.getContext('2d');
     this.traitDistEl = document.getElementById('trait-distribution');
@@ -3976,6 +3993,8 @@ const ui = {
         if (l.genome[gene] > best.genome[gene]) best = l;
       }
       sim.selectedLurch = best;
+      ui._lastSelectedAlive = true;
+      ui._deathAnimating = false;
       sim.selectedCell = { x: best.x, y: best.y };
       renderer.scrollX = best.x - Math.floor(renderer.visibleCols / 2);
       renderer.scrollY = best.y - Math.floor(renderer.visibleRows / 2);
@@ -4029,23 +4048,21 @@ const ui = {
     }
 
     // Tooltip — refresh if visible
-    if (this.tooltipEl.style.display === 'block') {
+    if (this.tooltipEl.style.display === 'block' && !this._deathAnimating) {
       if (sim.selectedLurch) {
         if (sim.selectedLurch.alive) {
           // Follow the living lurch as it moves
+          this._lastSelectedAlive = true;
           const gx = sim.selectedLurch.x;
           const gy = sim.selectedLurch.y;
           sim.selectedCell = { x: gx, y: gy };
           this.showTooltip(gx, gy, sim.selectedLurch);
-        } else {
-          // Dead lurch — refresh memorial in place
-          this.tooltipHeaderEl.innerHTML = `<strong style="color:#666677">@ #${sim.selectedLurch.id}</strong><span style="color:#aa4444;font-size:11px;"> [DEAD]</span>`;
-          this.renderTooltipStats(sim.selectedLurch, sim.selectedCell ? sim.selectedCell.x : 0, sim.selectedCell ? sim.selectedCell.y : 0);
-          this.renderTooltipGenome(sim.selectedLurch);
-          if (sim.selectedCell) {
-            this.renderTooltipTerrain(sim.selectedCell.x, sim.selectedCell.y, true);
-          }
+        } else if (this._lastSelectedAlive) {
+          // Just died — trigger skull death animation
+          this._lastSelectedAlive = false;
+          this.showDeathAnimation();
         }
+        // If already dead (_lastSelectedAlive === false), do nothing — animation handles it
       } else if (sim.selectedCell) {
         // Empty cell — refresh terrain, check if a lurch arrived
         const lurchNow = world.getLurch(sim.selectedCell.x, sim.selectedCell.y);
@@ -4101,11 +4118,8 @@ const ui = {
     ctx.fillStyle = 'rgba(68, 102, 68, 0.2)';
     ctx.fill();
 
-    // Labels
-    ctx.fillStyle = '#556655';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(data[data.length - 1], 4, 12);
+    // Population count — in the panel title row
+    document.getElementById('pop-display').textContent = data[data.length - 1];
   },
 
   drawTraitDistribution(alive) {
@@ -4124,7 +4138,7 @@ const ui = {
       html += `<div class="gene-bar">
         <span class="gene-label">${GENE_SHORT[g]}</span>
         <div class="gene-track"><div class="gene-fill" style="width:${w}%;background:${GENE_COLORS[g]}"></div></div>
-        <span class="gene-val">${counts[g]}<br>(${pct}%)</span>
+        <span class="gene-val" style="color:${GENE_COLORS[g]}">${pct}%<br><span style="opacity:0.5">${counts[g]}</span></span>
         <span class="gene-find" data-gene="${g}" title="Find top ${g} lurch">&#x25B6;</span>
       </div>`;
     }
@@ -4258,6 +4272,8 @@ const ui = {
   },
 
   showTooltip(gx, gy, lurch) {
+    // Ensure death overlay is hidden when showing fresh tooltip
+    this.tooltipDeathEl.style.display = 'none';
     if (lurch) {
       const dead = !lurch.alive;
       this.tooltipHeaderEl.style.display = 'block';
@@ -4279,17 +4295,95 @@ const ui = {
 
   hideTooltip() {
     this.tooltipEl.style.display = 'none';
+    this.tooltipEl.style.flexDirection = '';
+    this.tooltipEl.style.width = '';
+    this.tooltipEl.style.height = '';
+    this.tooltipDeathEl.style.display = 'none';
+    this.tooltipTerrainEl.style.display = '';
+    this._deathAnimating = false;
+    this._lastSelectedAlive = true;
     sim.selectedLurch = null;
     sim.selectedCell = null;
   },
 
+  // ── Death skull overlay animation ──
+  showDeathAnimation() {
+    if (this._deathAnimating) return;
+    this._deathAnimating = true;
+    // Lock tooltip to its current size and make it a flex column
+    // so the death div can flex:1 to fill the space below the header
+    const w = this.tooltipEl.offsetWidth;
+    const h = this.tooltipEl.offsetHeight;
+    this.tooltipEl.style.width = w + 'px';
+    this.tooltipEl.style.height = h + 'px';
+    this.tooltipEl.style.display = 'flex';
+    this.tooltipEl.style.flexDirection = 'column';
+    // Update header to show [DEAD]
+    const lurch = sim.selectedLurch;
+    if (lurch) {
+      this.tooltipHeaderEl.style.display = 'block';
+      this.tooltipHeaderEl.innerHTML = `<strong style="color:#666677">@ #${lurch.id}</strong><span style="color:#aa4444;font-size:11px;"> [DEAD]</span>`;
+    }
+    // Hide stats/genome/terrain, show skull sized to fill remaining space
+    this.tooltipBodyEl.style.display = 'none';
+    this.tooltipTerrainEl.style.display = 'none';
+    const skull = `                 uuuuuuu
+             uu$$$$$$$$$$$uu
+          uu$$$$$$$$$$$$$$$$$uu
+         u$$$$$$$$$$$$$$$$$$$$$u
+        u$$$$$$$$$$$$$$$$$$$$$$$u
+       u$$$$$$$$$$$$$$$$$$$$$$$$$u
+       u$$$$$$$$$$$$$$$$$$$$$$$$$u
+       u$$$$$$"   "$$$"   "$$$$$$u
+       "$$$$"      u$u       $$$$"
+        $$$u       u$u       u$$$
+        $$$u      u$$$u      u$$$
+         "$$$$uu$$$   $$$uu$$$$"
+          "$$$$$$$"   "$$$$$$$"
+            u$$$$$$$u$$$$$$$u
+             u$"$"$"$"$"$"$u
+  uuu        $$u$ $ $ $ $u$$       uuu
+ u$$$$        $$$$$u$u$u$$$       u$$$$
+  $$$$$uu      "$$$$$$$$$"     uu$$$$$$
+u$$$$$$$$$$$uu    """""    uuuu$$$$$$$$$$
+$$$$"""$$$$$$$$$$uuu   uu$$$$$$$$$"""$$$"
+ """      ""$$$$$$$$$$$uu ""$"""
+           uuuu ""$$$$$$$$$$uuu
+  u$$$uuu$$$$$$$$$uu ""$$$$$$$$$$$uuu$$$
+  $$$$$$$$$$""""           ""$$$$$$$$$$$"
+   "$$$$$"                      ""$$$$""
+     $$$"                         $$$$"`;
+    // Scale font to fit ~80% of available space so the skull breathes
+    const headerH = this.tooltipHeaderEl.offsetHeight || 30;
+    const availH = h - headerH;
+    const availW = w;
+    const fontSize = Math.min(availH / 26 / 1.15, availW / 43 * 1.65) * 0.78;
+    this.tooltipDeathEl.innerHTML = `<pre style="font-size:${fontSize.toFixed(1)}px">${skull}</pre>`;
+    this.tooltipDeathEl.style.display = 'flex';
+    // Vanish after 2.5 seconds
+    setTimeout(() => {
+      if (!this._deathAnimating) return;
+      this.hideTooltip();
+      renderer.render();
+    }, 2500);
+  },
+
   // Called only on click — shows tooltip for the clicked cell
   selectCell(x, y) {
+    // Cancel any in-progress death animation
+    this.tooltipDeathEl.style.display = 'none';
+    this.tooltipTerrainEl.style.display = '';
+    this.tooltipEl.style.flexDirection = '';
+    this.tooltipEl.style.width = '';
+    this.tooltipEl.style.height = '';
+    this._deathAnimating = false;
     const lurchHere = world.getLurch(x, y);
     if (lurchHere && lurchHere.alive) {
       sim.selectedLurch = lurchHere;
+      this._lastSelectedAlive = true;
     } else {
       sim.selectedLurch = null;
+      this._lastSelectedAlive = true;
     }
     sim.selectedCell = { x, y };
     this.showTooltip(x, y, lurchHere && lurchHere.alive ? lurchHere : null);
@@ -4563,6 +4657,10 @@ function initInput() {
     const lurch = world.lurches.find(l => l.id === id);
     if (!lurch) return;
     sim.selectedLurch = lurch;
+    ui._lastSelectedAlive = lurch.alive;
+    ui._deathAnimating = false;
+    ui.tooltipDeathEl.style.display = 'none';
+    ui.tooltipTerrainEl.style.display = '';
     const gx = lurch.x;
     const gy = lurch.y;
     sim.selectedCell = { x: gx, y: gy };
@@ -4783,7 +4881,7 @@ const HELP_CONTENT = {
       <tr><td><span style="color:#ff4444">@</span></td><td>Strength — aggression, combat power</td></tr>
       <tr><td><span style="color:#4488ff">@</span></td><td>Intelligence — planning, teaching</td></tr>
       <tr><td><span style="color:#ffff44">@</span></td><td>Adaptability — environmental resilience</td></tr>
-      <tr><td><span style="color:#cccccc">@</span></td><td>Perception — awareness, detection</td></tr>
+      <tr><td><span style="color:#ff9944">@</span></td><td>Perception — awareness, detection</td></tr>
       <tr><td><span style="color:#ffffff">@</span></td><td>Size — bulk, hit points</td></tr>
     </table>
     <h3>Visual Indicators</h3>
@@ -4804,15 +4902,15 @@ const HELP_CONTENT = {
       <tr><td><strong style="color:#ff2010">Red aura</strong></td><td>Recent killer (fades over 3 days)</td></tr>
     </table>
     <h3>Fighting &amp; War Bands</h3>
-    <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> are aggressive — they attack neighbors. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally. Kills yield modest spoils, but combat is costly — it drains energy and burns hunger. Fighters still need to eat regularly. Kills leave a lingering blood stain (<span style="color:#881111">†</span>) on the ground, and killers glow <strong style="color:#ff2010">red</strong> for 3 days — visible even at max speed.</p>
+    <p>Lurches with high <span style="color:#ff4444">STR</span> + <span style="color:#ffffff">SIZ</span> and low <span style="color:#4488ff">INT</span> + <span style="color:#ff9944">PER</span> are aggressive — they attack neighbors. Attack power scales with STR and SIZ. Brutes near other brutes form <strong>war bands</strong>: +20% damage per ally. Kills yield modest spoils, but combat is costly — it drains energy and burns hunger. Fighters still need to eat regularly. Kills leave a lingering blood stain (<span style="color:#881111">†</span>) on the ground, and killers glow <strong style="color:#ff2010">red</strong> for 3 days — visible even at max speed.</p>
     <p>Defenders can <strong>evade</strong> attacks based on INT + SPD + PER (up to ~55% dodge chance). Beefy defenders (STR or SIZ &gt; 0.4) <strong>counter-strike</strong>, dealing damage back to the attacker. Fighters can die from their own aggression. INT Lurches get a solo defense bonus from pure intelligence, and can <strong>play dead</strong> to survive lethal hits (see Death Escape).</p>
     <h3>Cooperation &amp; Academies</h3>
-    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#cccccc">PER</span> cooperate instead of fight. When cooperators cluster together, they gain compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
+    <p>Lurches with high <span style="color:#4488ff">INT</span> + <span style="color:#ff9944">PER</span> cooperate instead of fight. When cooperators cluster together, they gain compounding benefits: food cultivation (farming nearby tiles), cooperative defense (up to 60% damage reduction from allies), passive healing, amplified teaching, a small fertility bonus, and reduced crowding stress. Cooperators stay put rather than wander. Blue <span style="color:#4488ff">&#x2764;</span> flashes mark cooperation events.</p>
     <p>When INT Lurches cluster together, they form <strong>academies</strong> — a higher level of cooperation. Academy members lock down, glow golden, farm wide, edify neighbors, and nurture smart offspring. Academies are self-sustaining intellectual enclaves that spread INT through both education and reproduction (see the AI &amp; Behavior tab for details).</p>
     <h3>Grouping &amp; Survival</h3>
     <p>When food is scarce, Lurches seek out companions instead of wandering randomly — smarter Lurches do this sooner. Different survival mechanics activate at different population thresholds:</p>
     <p><strong>Wider awareness</strong> (&lt;150 pop) — scan range extends by up to +4 cells, so scattered Lurches can detect each other across a sparse map.</p>
-    <p><strong>Migration pull</strong> (&lt;150 pop) — Lurches drift toward the population center instead of wandering randomly. High <span style="color:#cccccc">PER</span> and <span style="color:#4488ff">INT</span> Lurches feel the pull most strongly (up to 100% bias), while even instinctive Lurches get a 30% drift. This draws survivors together over time.</p>
+    <p><strong>Migration pull</strong> (&lt;150 pop) — Lurches drift toward the population center instead of wandering randomly. High <span style="color:#ff9944">PER</span> and <span style="color:#4488ff">INT</span> Lurches feel the pull most strongly (up to 100% bias), while even instinctive Lurches get a 30% drift. This draws survivors together over time.</p>
     <p><strong>Aggression dampening</strong> (&lt;100 pop) — brutes become less aggressive. At 50 pop, aggression is halved. When the species is scarce, even fighters hold back.</p>
     <p><strong>Recovery burst</strong> (&lt;75 pop) — a fertility spike fires when population drops below 75, then rapidly fades back to baseline. A second emergency burst fires below 25 and lingers slightly longer — a last gasp. Mating range extends from 1 to 2 cells under 200 population.</p>
     <p><strong>Agriculture effect</strong> — all Lurches contribute small food regrowth to nearby cells just by being present. Cooperators contribute much more (intentional farming). Lurches in groups of 2+ also burn hunger 10–20% slower — the efficiency of cooperative living. This creates a positive feedback loop: grouping → more food → less wandering → more grouping.</p>
@@ -4831,7 +4929,7 @@ const HELP_CONTENT = {
       <tr><td style="color:#ff4444">Strength</td><td>Attack damage, fight initiation, counter-strikes</td><td>Higher food needs</td></tr>
       <tr><td style="color:#4488ff">Intelligence</td><td>Decision quality, teaching, discovery, evasion, smart foraging, efficient metabolism</td><td>No direct combat bonus</td></tr>
       <tr><td style="color:#ffff44">Adaptability</td><td>Terrain resistance, disease tolerance</td><td>Highest metabolism cost</td></tr>
-      <tr><td style="color:#cccccc">Perception</td><td>Scan range, threat detection, cooperation, evasion, migration pull</td><td>Stress from crowds</td></tr>
+      <tr><td style="color:#ff9944">Perception</td><td>Scan range, threat detection, cooperation, evasion, migration pull</td><td>Stress from crowds</td></tr>
       <tr><td style="color:#ffffff">Size</td><td>Max HP, combat advantage, counter-strikes</td><td>Needs most food, easy to spot</td></tr>
     </table>
     <h3>Inheritance</h3>
