@@ -1,8 +1,8 @@
 # LURCHES
 
-A genetic simulation sandbox with an ASCII attitude
+**A genetic simulation sandbox with an ASCII attitude**
 
-_In the summer of 1992, a friend and I, between driveway basketball and NES, wrote Pascal games on a 486 with 4 MB RAM and a dial-up modem. One of the games we wrote was Lurches, and now Claude has helped me manifest the nostalgia. Enjoy!_  
+*In the summer of 1992, a friend and I, between driveway basketball and NES, wrote Pascal games on a 486 with 4 MB RAM and a dial-up modem. One of the games we wrote was Lurches, and now Claude has helped me manifest the nostalgia. Enjoy!*
 
 **[Play it live at lurches.net](https://lurches.net)**
 
