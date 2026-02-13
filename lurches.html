@@ -3442,11 +3442,15 @@ class Simulation {
       this.totalBirths++;
       this.log(`#${lurch.id} × #${mate.id} → offspring #${child.id}`, 'birth');
 
-      // Legend detection: born with a perfect 1.0 in any trait
+    // Legend detection: >0.99 for most traits, but INT requires exactly 1.0
       const cg = child.genome;
       const legendTraits = [];
       for (const gene of GENES) {
-        if (cg[gene] >= 1.0) legendTraits.push(GENE_SHORT[gene]);
+        if (gene === 'intelligence') {
+          if (cg[gene] >= 1.0) legendTraits.push(GENE_SHORT[gene]);
+        } else {
+          if (cg[gene] > 0.99) legendTraits.push(GENE_SHORT[gene]);
+        }
       }
       if (legendTraits.length > 0) {
         const icon = legendTraits.length > 1 ? '👑' : '🐐';
